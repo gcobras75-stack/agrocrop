@@ -131,6 +131,14 @@ export default function AgroCropDashboard() {
   // NEW: Saved parcels modal
   const [showParcelasModal, setShowParcelasModal] = useState(false);
 
+  // NEW: Save polygon modal
+  const [showSavePolygonModal, setShowSavePolygonModal] = useState(false);
+  const [newParcelName, setNewParcelName] = useState('');
+  const [newParcelCultivo, setNewParcelCultivo] = useState('');
+
+  // NEW: Persistent saved parcels
+  const [savedParcelas, setSavedParcelas] = useState<any[]>([]);
+
   // NEW: Claude analysis collapsible
   const [showClaudeAnalysis, setShowClaudeAnalysis] = useState(true);
 
@@ -350,7 +358,7 @@ ${(cropData as any).proyeccion ? `
 ━━━━━━━━━━━━━━━━━
 ${mangoSection}
 
-🤖 _Generado con AgroCrop v2.1_
+🤖 _Generado con AgroCrop v2.2_
 _Datos: ESA Copernicus, NASA, USGS_`;
 
       await Share.share({
@@ -438,8 +446,40 @@ _Datos: ESA Copernicus, NASA, USGS_`;
     setCropAreaMode('draw'); // ensure mode stays draw
     console.log('[AgroCrop] Trazado finalizado:', polygonCoords.length, 'vertices');
     if (polygonCoords.length >= 3) {
-      setShowCropModal(true);
+      setShowSavePolygonModal(true);
     }
+  };
+
+  // ── Persistent parcel storage ────────────────────────────────────────────
+  const guardarParcela = async (nombre: string, coords: Coordinate[], tipoCultivo: string) => {
+    const parcelas = await AsyncStorage.getItem('mis_parcelas');
+    const lista = parcelas ? JSON.parse(parcelas) : [];
+    const nueva = {
+      id: Date.now().toString(),
+      nombre,
+      coordenadas: coords,
+      tipo_cultivo: tipoCultivo,
+      hectareas: Math.round(calcPolygonArea(coords) / 10000),
+      fecha_creacion: new Date().toISOString(),
+      ultimo_analisis: null,
+    };
+    lista.push(nueva);
+    await AsyncStorage.setItem('mis_parcelas', JSON.stringify(lista));
+    setSavedParcelas(lista);
+    return nueva;
+  };
+
+  const cargarParcelas = async () => {
+    const data = await AsyncStorage.getItem('mis_parcelas');
+    if (data) setSavedParcelas(JSON.parse(data));
+  };
+
+  const borrarParcela = async (id: string) => {
+    const data = await AsyncStorage.getItem('mis_parcelas');
+    const lista = data ? JSON.parse(data) : [];
+    const filtered = lista.filter((p: any) => p.id !== id);
+    await AsyncStorage.setItem('mis_parcelas', JSON.stringify(filtered));
+    setSavedParcelas(filtered);
   };
 
   // ── OCR: Internal processing function ────────────────────────────────────────
@@ -688,6 +728,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
           if (parsed.length > 0) setPolygonCoords(parsed);
         }
         await initDB();
+        await cargarParcelas();
       } catch (e) {}
     };
     loadSaved();
@@ -873,7 +914,19 @@ _Datos: ESA Copernicus, NASA, USGS_`;
 
           {/* Numbered vertex markers */}
           {resolvedPolygonCoords.map((coord, i) => (
-            <Marker key={`p-${i}`} coordinate={coord} anchor={{ x: 0.5, y: 0.5 }} zIndex={10}>
+            <Marker
+              key={`p-${i}`}
+              coordinate={coord}
+              anchor={{ x: 0.5, y: 0.5 }}
+              zIndex={10}
+              draggable={cropDrawing}
+              onDragEnd={(e) => {
+                const newCoords = [...polygonCoords];
+                newCoords[i] = e.nativeEvent.coordinate;
+                setPolygonCoords(newCoords);
+                triggerHaptic('light');
+              }}
+            >
               <View style={{ backgroundColor: COLORS.verdeMedio, borderRadius: 50, width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFF' }}>
                 <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 12 }}>{i + 1}</Text>
               </View>
@@ -911,7 +964,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
         {cropDrawing && (
           <>
             <View style={{ position: 'absolute', top: 44, left: 12, right: 12, zIndex: 999, backgroundColor: COLORS.verdeMedio, padding: 12, borderRadius: 12, alignItems: 'center' }}>
-              <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 15 }}>📍 Toca el mapa para agregar puntos</Text>
+              <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 15 }}>📍 Toca el mapa para agregar puntos • Arrastra para ajustar</Text>
               <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 }}>{polygonCoords.length} {polygonCoords.length === 1 ? 'punto' : 'puntos'} marcados</Text>
             </View>
             <View style={{ position: 'absolute', bottom: 100, left: 16, right: 16, zIndex: 999, flexDirection: 'row', gap: 10 }}>
@@ -936,7 +989,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
 
         {/* VERSION TAG */}
         <View style={styles.versionTag}>
-          <Text style={styles.versionTagText}>AgroCrop v2.1</Text>
+          <Text style={styles.versionTagText}>AgroCrop v2.2</Text>
         </View>
 
         {/* FLOATING MAP CONTROLS (RIGHT) */}
@@ -1110,52 +1163,138 @@ _Datos: ESA Copernicus, NASA, USGS_`;
               </TouchableOpacity>
             </View>
             <ScrollView style={{ flex: 1 }}>
-              {cropPolygons.length === 0 ? (
+              {savedParcelas.length === 0 ? (
                 <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-                  <Text style={{ color: '#999', fontSize: 14 }}>No tienes parcelas guardadas</Text>
-                  <Text style={{ color: '#666', fontSize: 12, marginTop: 8 }}>Analiza un area para guardar tu primera parcela</Text>
+                  <Text style={{ color: '#999', fontSize: 16 }}>📭 Aun no tienes parcelas guardadas</Text>
+                  <TouchableOpacity
+                    style={{ marginTop: 16, backgroundColor: COLORS.verdeClaro, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 }}
+                    onPress={() => { setShowParcelasModal(false); setCropDrawing(true); selectMode('polygon'); setPolygonCoords([]); }}
+                  >
+                    <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 14 }}>Trazar mi primera parcela</Text>
+                  </TouchableOpacity>
                 </View>
               ) : (
-                cropPolygons.map((p, i) => (
-                  <View key={p.id} style={styles.parcelaCard}>
+                savedParcelas.map((parcela) => (
+                  <View key={parcela.id} style={styles.parcelaCard}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                      <View style={[styles.parcelaColorDot, { backgroundColor: p.color }]} />
+                      <View style={[styles.parcelaColorDot, { backgroundColor: COLORS.verdeClaro }]} />
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.parcelaName}>{p.nombre}</Text>
-                        <Text style={styles.parcelaInfo}>{p.hectareas} ha - {p.origen}</Text>
+                        <Text style={styles.parcelaName}>{parcela.nombre}</Text>
+                        <Text style={styles.parcelaInfo}>{parcela.hectareas} ha - {parcela.tipo_cultivo}</Text>
+                        <Text style={{ color: '#999', fontSize: 11, marginTop: 2 }}>Creada: {new Date(parcela.fecha_creacion).toLocaleDateString()}</Text>
                       </View>
                     </View>
                     <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
                       <TouchableOpacity style={styles.parcelaActionBtn} onPress={() => {
-                        setPolygonCoords(p.coords);
-                        setCropAreaMode(p.origen === 'manual' ? 'draw' : 'coords');
-                        const lats = p.coords.map(c => c.latitude);
-                        const lngs = p.coords.map(c => c.longitude);
-                        mapRef.current?.animateToRegion({
-                          latitude: (Math.min(...lats) + Math.max(...lats)) / 2,
-                          longitude: (Math.min(...lngs) + Math.max(...lngs)) / 2,
-                          latitudeDelta: (Math.max(...lats) - Math.min(...lats)) * 1.4,
-                          longitudeDelta: (Math.max(...lngs) - Math.min(...lngs)) * 1.4,
-                        }, 800);
-                        setShowParcelasModal(false);
-                      }}>
-                        <Text style={styles.parcelaActionText}>Ver en mapa</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.parcelaActionBtn} onPress={() => {
-                        setPolygonCoords(p.coords);
-                        setCropAreaMode(p.origen === 'manual' ? 'draw' : 'coords');
+                        setPolygonCoords(parcela.coordenadas);
+                        setCropTipoCultivo(parcela.tipo_cultivo);
+                        setCropAreaMode('draw');
                         setShowParcelasModal(false);
                         startCropAnalysis();
                       }}>
                         <Text style={styles.parcelaActionText}>Analizar</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={[styles.parcelaActionBtn, { borderColor: COLORS.rojo }]} onPress={() => setCropPolygons(prev => prev.filter(x => x.id !== p.id))}>
+                      <TouchableOpacity style={[styles.parcelaActionBtn, { borderColor: COLORS.rojo }]} onPress={() => borrarParcela(parcela.id)}>
                         <Text style={[styles.parcelaActionText, { color: COLORS.rojo }]}>Borrar</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
                 ))
               )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ═══ SAVE POLYGON MODAL ═══ */}
+      <Modal visible={showSavePolygonModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.parcelasModalContent, { maxHeight: '85%' }]}>
+            <ScrollView>
+              <Text style={{ fontSize: 20, fontWeight: '900', color: COLORS.verdePrimario, textAlign: 'center', marginTop: 16 }}>POLIGONO CREADO</Text>
+              <Text style={{ textAlign: 'center', color: '#666', fontSize: 13, marginTop: 6 }}>
+                {Math.round(calcPolygonArea(polygonCoords) / 10000)} ha  -  {polygonCoords.length} vertices
+              </Text>
+
+              <Text style={{ fontWeight: '700', color: COLORS.negroSuave, marginTop: 20, marginLeft: 16 }}>Nombre de la parcela</Text>
+              <TextInput
+                style={{ borderWidth: 1, borderColor: '#DDD', borderRadius: 10, padding: 12, margin: 16, marginTop: 8, fontSize: 15, color: COLORS.negroSuave }}
+                placeholder="Mi parcela..."
+                placeholderTextColor="#AAA"
+                value={newParcelName}
+                onChangeText={setNewParcelName}
+              />
+
+              <Text style={{ fontWeight: '700', color: COLORS.negroSuave, marginLeft: 16 }}>Tipo de cultivo</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 16, paddingTop: 8 }}>
+                {['maiz_riego', 'maiz_temporal', 'mango_ataulfo', 'mango_kent', 'mango_tommy', 'tomate', 'chile', 'aguacate', 'sorgo', 'limon'].map(cultivo => (
+                  <TouchableOpacity
+                    key={cultivo}
+                    onPress={() => setNewParcelCultivo(cultivo)}
+                    style={{
+                      paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+                      backgroundColor: newParcelCultivo === cultivo ? COLORS.verdeClaro : '#F0F0F0',
+                      borderWidth: 1,
+                      borderColor: newParcelCultivo === cultivo ? COLORS.verdeMedio : '#DDD',
+                    }}
+                  >
+                    <Text style={{ color: newParcelCultivo === cultivo ? '#FFF' : '#555', fontWeight: '600', fontSize: 13 }}>{cultivo.replace('_', ' ')}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {(newParcelName.length > 0 && newParcelName.length < 3) && (
+                <Text style={{ color: COLORS.rojo, fontSize: 12, marginLeft: 16 }}>El nombre debe tener al menos 3 caracteres</Text>
+              )}
+
+              <TouchableOpacity
+                style={{
+                  backgroundColor: (newParcelName.length >= 3 && newParcelCultivo) ? COLORS.verdeClaro : '#CCC',
+                  padding: 16, borderRadius: 12, margin: 16, alignItems: 'center',
+                }}
+                disabled={newParcelName.length < 3 || !newParcelCultivo}
+                onPress={async () => {
+                  await guardarParcela(newParcelName, polygonCoords, newParcelCultivo);
+                  setShowSavePolygonModal(false);
+                  setNewParcelName('');
+                  setNewParcelCultivo('');
+                  triggerHaptic('success');
+                  Alert.alert('Parcela guardada', 'Tu parcela ha sido guardada exitosamente.');
+                }}
+              >
+                <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 15 }}>GUARDAR PARCELA</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{
+                  backgroundColor: (newParcelName.length >= 3 && newParcelCultivo) ? COLORS.amarilloMaiz : '#CCC',
+                  padding: 16, borderRadius: 12, marginHorizontal: 16, alignItems: 'center',
+                }}
+                disabled={newParcelName.length < 3 || !newParcelCultivo}
+                onPress={async () => {
+                  await guardarParcela(newParcelName, polygonCoords, newParcelCultivo);
+                  setCropTipoCultivo(newParcelCultivo);
+                  setCropAreaMode('draw');
+                  setShowSavePolygonModal(false);
+                  setNewParcelName('');
+                  setNewParcelCultivo('');
+                  triggerHaptic('success');
+                  startCropAnalysis();
+                }}
+              >
+                <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 15 }}>GUARDAR Y ANALIZAR AHORA</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{ alignItems: 'center', paddingVertical: 16 }}
+                onPress={() => {
+                  setShowSavePolygonModal(false);
+                  setCropDrawing(true);
+                  selectMode('polygon');
+                }}
+              >
+                <Text style={{ color: COLORS.verdeMedio, fontWeight: '600', fontSize: 14 }}>← Seguir editando</Text>
+              </TouchableOpacity>
             </ScrollView>
           </View>
         </View>
