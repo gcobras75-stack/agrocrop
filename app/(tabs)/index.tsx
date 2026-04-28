@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator, Platform, TouchableOpacity, Alert, Modal, TextInput, ScrollView, Switch, Share, Animated, Dimensions } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
-import MapView, { Marker, Polygon, Region, MapPressEvent } from 'react-native-maps';
+import MapView, { Marker, Polygon, Polyline, Region, MapPressEvent } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -350,7 +350,7 @@ ${(cropData as any).proyeccion ? `
 ━━━━━━━━━━━━━━━━━
 ${mangoSection}
 
-🤖 _Generado con AgroCrop v2.0_
+🤖 _Generado con AgroCrop v2.1_
 _Datos: ESA Copernicus, NASA, USGS_`;
 
       await Share.share({
@@ -698,8 +698,12 @@ _Datos: ESA Copernicus, NASA, USGS_`;
     updateGridViewport(region);
   };
 
-  const handleMapPress = (_e: MapPressEvent) => {
-    // AgroCrop: map taps are no-op unless in polygon drawing mode (handled by crosshair)
+  const handleMapPress = (e: MapPressEvent) => {
+    if (cropDrawing) {
+      const coord = e.nativeEvent.coordinate;
+      setPolygonCoords(prev => [...prev, { latitude: coord.latitude, longitude: coord.longitude }]);
+      triggerHaptic('light');
+    }
   };
 
   const selectMode = (type: DrawingType) => {
@@ -847,11 +851,31 @@ _Datos: ESA Copernicus, NASA, USGS_`;
             />
           )}
 
-          {/* Vertex markers */}
+          {/* Polyline connecting points during drawing */}
+          {cropDrawing && polygonCoords.length >= 2 && (
+            <Polyline
+              coordinates={polygonCoords}
+              strokeColor={COLORS.verdeNeon}
+              strokeWidth={3}
+              zIndex={4}
+            />
+          )}
+          {/* Dashed preview line from last point back to first (close preview) */}
+          {cropDrawing && polygonCoords.length >= 3 && (
+            <Polyline
+              coordinates={[polygonCoords[polygonCoords.length - 1], polygonCoords[0]]}
+              strokeColor={COLORS.verdeNeon}
+              strokeWidth={2}
+              lineDashPattern={[8, 6]}
+              zIndex={4}
+            />
+          )}
+
+          {/* Numbered vertex markers */}
           {resolvedPolygonCoords.map((coord, i) => (
-            <Marker key={`p-${i}`} coordinate={coord} anchor={{ x: 0.5, y: 0.5 }}>
-              <View style={styles.vertexMarker}>
-                <View style={styles.vertexMarkerInner} />
+            <Marker key={`p-${i}`} coordinate={coord} anchor={{ x: 0.5, y: 0.5 }} zIndex={10}>
+              <View style={{ backgroundColor: COLORS.verdeMedio, borderRadius: 50, width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFF' }}>
+                <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 12 }}>{i + 1}</Text>
               </View>
             </Marker>
           ))}
@@ -881,32 +905,29 @@ _Datos: ESA Copernicus, NASA, USGS_`;
           ))}
         </MapView>
 
-        {/* CROSSHAIR for drawing mode */}
-        {drawingType === 'polygon' && (
-          <View style={styles.crosshairContainer} pointerEvents="none">
-            <MaterialCommunityIcons name="crosshairs" size={50} color={COLORS.verdeNeon} />
-          </View>
-        )}
+        {/* CROSSHAIR removed — direct tap to add points */}
 
         {/* CROP DRAW MODE OVERLAY */}
         {cropDrawing && (
           <>
-            <View style={styles.cropDrawBanner}>
-              <Text style={styles.cropDrawBannerTitle}>TRAZANDO POLIGONO</Text>
-              <Text style={styles.cropDrawBannerSubtitle}>Toca "Marcar Punto" para agregar vertices ({polygonCoords.length} vertices)</Text>
+            <View style={{ position: 'absolute', top: 44, left: 12, right: 12, zIndex: 999, backgroundColor: COLORS.verdeMedio, padding: 12, borderRadius: 12, alignItems: 'center' }}>
+              <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 15 }}>📍 Toca el mapa para agregar puntos</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 }}>{polygonCoords.length} {polygonCoords.length === 1 ? 'punto' : 'puntos'} marcados</Text>
             </View>
-            <View style={styles.cropDrawButtons}>
+            <View style={{ position: 'absolute', bottom: 100, left: 16, right: 16, zIndex: 999, flexDirection: 'row', gap: 10 }}>
               {polygonCoords.length > 0 && (
-                <TouchableOpacity style={styles.cropDrawUndo} onPress={() => setPolygonCoords(polygonCoords.slice(0, -1))}>
-                  <Text style={styles.cropDrawUndoText}>Deshacer</Text>
+                <TouchableOpacity style={{ flex: 1, backgroundColor: COLORS.negroSuave, padding: 14, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }} onPress={() => setPolygonCoords(polygonCoords.slice(0, -1))}>
+                  <MaterialCommunityIcons name="undo" size={18} color="#FFF" />
+                  <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 14 }}>Deshacer</Text>
                 </TouchableOpacity>
               )}
-              <TouchableOpacity style={styles.cropDrawCancel} onPress={() => { setCropDrawing(false); selectMode('none'); setPolygonCoords([]); }}>
-                <Text style={styles.cropDrawCancelText}>Cancelar</Text>
+              <TouchableOpacity style={{ flex: 1, backgroundColor: '#FFF', padding: 14, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: COLORS.rojo }} onPress={() => { setCropDrawing(false); selectMode('none'); setPolygonCoords([]); }}>
+                <Text style={{ color: COLORS.rojo, fontWeight: '700', fontSize: 14 }}>Cancelar</Text>
               </TouchableOpacity>
               {polygonCoords.length >= 3 && (
-                <TouchableOpacity style={styles.cropDrawFinish} onPress={finishCropDraw}>
-                  <Text style={styles.cropDrawFinishText}>FINALIZAR ({polygonCoords.length}v)</Text>
+                <TouchableOpacity style={{ flex: 2, backgroundColor: COLORS.verdeClaro, padding: 14, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }} onPress={finishCropDraw}>
+                  <MaterialCommunityIcons name="check-circle" size={18} color="#FFF" />
+                  <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 14 }}>CERRAR POLIGONO</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -915,7 +936,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
 
         {/* VERSION TAG */}
         <View style={styles.versionTag}>
-          <Text style={styles.versionTagText}>AgroCrop v2.0</Text>
+          <Text style={styles.versionTagText}>AgroCrop v2.1</Text>
         </View>
 
         {/* FLOATING MAP CONTROLS (RIGHT) */}
@@ -977,32 +998,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
           </View>
         )}
 
-        {/* Drawing mode bottom console */}
-        {drawingType === 'polygon' && !cropDrawing && (
-          <View style={styles.drawingConsole}>
-            <Text style={styles.drawingConsoleTitle}>TRAZANDO ({polygonCoords.length} VERTICES)</Text>
-            <View style={styles.drawingConsoleRow}>
-              <TouchableOpacity style={styles.drawingMarkBtn} onPress={addPointFromCrosshair}>
-                <MaterialCommunityIcons name="target" size={18} color="#FFF" />
-                <Text style={styles.drawingMarkBtnText}>MARCAR ({polygonCoords.length})</Text>
-              </TouchableOpacity>
-              {polygonCoords.length >= 3 && (
-                <TouchableOpacity style={styles.drawingFinishBtn} onPress={() => finishDrawing()}>
-                  <MaterialCommunityIcons name="check" size={18} color="#FFF" />
-                  <Text style={styles.drawingFinishBtnText}>FINALIZAR</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-            <View style={styles.drawingConsoleRow}>
-              <TouchableOpacity style={styles.drawingSecBtn} onPress={() => setPolygonCoords([])}>
-                <Text style={styles.drawingSecBtnText}>LIMPIAR</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.drawingSecBtn} onPress={() => selectMode('none')}>
-                <Text style={styles.drawingSecBtnText}>SALIR</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
+        {/* Old crosshair drawing console removed — replaced by direct tap mode */}
       </View>
 
       {/* ═══ INFO ZONE BAR (only when polygon exists) ═══ */}
@@ -1174,17 +1170,6 @@ _Datos: ESA Copernicus, NASA, USGS_`;
             <Text style={styles.bottomSheetTitle}>🌾 ¿Donde estan tus cultivos?</Text>
 
             {/* Option Cards */}
-            <TouchableOpacity style={styles.optionCard} onPress={() => { setCropAreaMode('circle'); }}>
-              <View style={styles.optionCardIcon}>
-                <Text style={{ fontSize: 24 }}>🟡</Text>
-              </View>
-              <View style={styles.optionCardBody}>
-                <Text style={styles.optionCardTitle}>AREA CIRCULAR</Text>
-                <Text style={styles.optionCardSubtitle}>Dibuja un circulo alrededor de tu zona</Text>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={24} color="#999" />
-            </TouchableOpacity>
-
             <TouchableOpacity style={styles.optionCard} onPress={startCropDrawMode}>
               <View style={styles.optionCardIcon}>
                 <Text style={{ fontSize: 24 }}>✏️</Text>
@@ -1218,71 +1203,40 @@ _Datos: ESA Copernicus, NASA, USGS_`;
               <MaterialCommunityIcons name="chevron-right" size={24} color="#999" />
             </TouchableOpacity>
 
-            {/* Inline content based on mode */}
-            {cropAreaMode === 'circle' && (
-              <View style={styles.inlineModeSection}>
-                <Text style={styles.inlineLabel}>Radio del area (km)</Text>
-                <View style={styles.radiusChips}>
-                  {[10, 20, 40, 60, 80].map(r => (
-                    <TouchableOpacity key={r} style={[styles.radiusChip, cropRadioKm === r && styles.radiusChipActive]} onPress={() => setCropRadioKm(r)}>
-                      <Text style={[styles.radiusChipText, cropRadioKm === r && styles.radiusChipTextActive]}>{r} km</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <Text style={styles.inlineAreaCalc}>Area: ~{Math.round(Math.PI * cropRadioKm * cropRadioKm).toLocaleString()} km²</Text>
-
-                <Text style={styles.inlineLabel}>Ubicaciones predefinidas</Text>
-                <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-                  <TouchableOpacity style={styles.locationPresetBtn} onPress={() => loadOsoViejoPolygon(cropRadioKm)}>
-                    <Text style={styles.locationPresetText}>Oso Viejo (Maiz)</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.locationPresetBtn} onPress={() => {
-                    const circle = generateCirclePolygon(22.8317, -105.7791, 10, 32);
-                    setPolygonCoords(circle.map(([lng, lat]) => ({ latitude: lat, longitude: lng })));
-                    setCropTipoCultivo('mango_ataulfo');
-                    setCropAreaMode('circle');
-                    mapRef.current?.animateToRegion({ latitude: 22.8317, longitude: -105.7791, latitudeDelta: 0.3, longitudeDelta: 0.3 }, 800);
-                    triggerHaptic('light');
-                  }}>
-                    <Text style={styles.locationPresetText}>Escuinapa (Mango)</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.locationPresetBtn} onPress={() => {
-                    const circle = generateCirclePolygon(22.9939, -105.8533, 15, 32);
-                    setPolygonCoords(circle.map(([lng, lat]) => ({ latitude: lat, longitude: lng })));
-                    setCropTipoCultivo('mango_ataulfo');
-                    setCropAreaMode('circle');
-                    mapRef.current?.animateToRegion({ latitude: 22.9939, longitude: -105.8533, latitudeDelta: 0.4, longitudeDelta: 0.4 }, 800);
-                    triggerHaptic('light');
-                  }}>
-                    <Text style={styles.locationPresetText}>Rosario (Mango)</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.bigGreenBtn}
-                  onPress={() => { setShowCropModal(false); startCropAnalysis(); }}
-                >
-                  <Text style={styles.bigGreenBtnText}>🌾 INICIAR ANALISIS</Text>
-                </TouchableOpacity>
-              </View>
-            )}
 
             {cropAreaMode === 'coords' && (
               <View style={styles.inlineModeSection}>
+                <Text style={{ color: COLORS.tierra, fontSize: 13, marginBottom: 8 }}>Ingresa un punto por linea:{'\n'}Formato: latitud, longitud</Text>
                 <TextInput
-                  style={styles.coordsInput}
+                  style={[styles.coordsInput, { height: 160, backgroundColor: '#F5F5F5', borderColor: '#DDD', borderWidth: 1 }]}
                   multiline
-                  placeholder={'24.3994, -107.1714\n24.4100, -107.1500\n24.3800, -107.1200'}
-                  placeholderTextColor="#999"
+                  placeholder={'Ejemplo:\n24.3994, -107.1714\n24.4100, -107.1500\n24.3800, -107.1200'}
+                  placeholderTextColor="#BBB"
                   value={cropCoordsText}
                   onChangeText={setCropCoordsText}
+                  keyboardType="numbers-and-punctuation"
                 />
-                <TouchableOpacity style={styles.coordsProcessBtn} onPress={applyCoordsFromText}>
-                  <Text style={styles.coordsProcessBtnText}>PROCESAR COORDENADAS</Text>
+                <TouchableOpacity style={[styles.coordsProcessBtn, { height: 50, borderRadius: 12 }]} onPress={applyCoordsFromText}>
+                  <Text style={styles.coordsProcessBtnText}>📍 PROCESAR COORDENADAS</Text>
                 </TouchableOpacity>
+
+                <Text style={{ color: '#999', fontSize: 12, marginTop: 12, marginBottom: 6 }}>O usa coordenadas de ejemplo:</Text>
+                <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                  <TouchableOpacity style={{ backgroundColor: COLORS.verdeSuave, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: COLORS.verdeClaro }} onPress={() => {
+                    setCropCoordsText('24.3994, -107.1714\n24.4500, -107.1714\n24.4500, -107.1200\n24.3994, -107.1200');
+                  }}>
+                    <Text style={{ color: COLORS.verdeMedio, fontWeight: '600', fontSize: 13 }}>Oso Viejo, Sin.</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={{ backgroundColor: COLORS.verdeSuave, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: COLORS.verdeClaro }} onPress={() => {
+                    setCropCoordsText('22.8500, -105.8000\n22.8500, -105.7500\n22.8100, -105.7500\n22.8100, -105.8000');
+                  }}>
+                    <Text style={{ color: COLORS.verdeMedio, fontWeight: '600', fontSize: 13 }}>Escuinapa, Sin.</Text>
+                  </TouchableOpacity>
+                </View>
+
                 {polygonCoords.length >= 3 && (
                   <TouchableOpacity
-                    style={styles.bigGreenBtn}
+                    style={[styles.bigGreenBtn, { marginTop: 16 }]}
                     onPress={() => { setShowCropModal(false); startCropAnalysis(); }}
                   >
                     <Text style={styles.bigGreenBtnText}>🌾 INICIAR ANALISIS</Text>
@@ -1609,7 +1563,7 @@ const styles = StyleSheet.create({
   mapTypeText: { color: '#FFF', fontSize: 12, fontWeight: '700' },
 
   // Map
-  mapContainer: { flex: 0.60, position: 'relative' },
+  mapContainer: { flex: 1, position: 'relative' },
   map: { ...StyleSheet.absoluteFillObject },
 
   // User location
