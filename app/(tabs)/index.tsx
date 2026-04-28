@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { StyleSheet, View, Text, ActivityIndicator, Platform, TouchableOpacity, Alert, Modal, TextInput, ScrollView, Switch, Share, Animated, Dimensions } from 'react-native';
+import { StyleSheet, View, Text, ActivityIndicator, Platform, TouchableOpacity, Alert, Modal, TextInput, ScrollView, Switch, Share, Animated, Dimensions, Linking } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import MapView, { Marker, Polygon, Polyline, Region, MapPressEvent } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -59,6 +59,7 @@ function calcPolygonArea(coords: Coordinate[]): number {
 
 export default function AgroCropDashboard() {
   const mapRef = useRef<MapView>(null);
+  const zoomTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // --- Map type toggle ---
   const [mapType, setMapType] = useState<'satellite' | 'standard'>('satellite');
@@ -228,6 +229,23 @@ export default function AgroCropDashboard() {
       triggerHaptic('success');
       setCropStep('');
 
+      // Update ultimo_analisis for matching saved parcel
+      try {
+        const stored = await AsyncStorage.getItem('mis_parcelas');
+        if (stored) {
+          const list = JSON.parse(stored);
+          const updated = list.map((p: any) => {
+            if (p.coordenadas && polygonCoords.length > 0 &&
+                Math.abs(p.coordenadas[0]?.latitude - polygonCoords[0]?.latitude) < 0.001) {
+              return { ...p, ultimo_analisis: new Date().toISOString() };
+            }
+            return p;
+          });
+          await AsyncStorage.setItem('mis_parcelas', JSON.stringify(updated));
+          setSavedParcelas(updated);
+        }
+      } catch {}
+
       // Step 3: Fetch heatmap grid + extended satellites in parallel (non-blocking)
       setCropGridLoading(true);
       setCropExtendedLoading(true);
@@ -358,7 +376,7 @@ ${(cropData as any).proyeccion ? `
 ━━━━━━━━━━━━━━━━━
 ${mangoSection}
 
-🤖 _Generado con AgroCrop v2.2_
+🤖 _Generado con AgroCrop v2.3_
 _Datos: ESA Copernicus, NASA, USGS_`;
 
       await Share.share({
@@ -429,6 +447,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
     const dLng = Math.max(...lngs) - Math.min(...lngs);
     mapRef.current?.animateToRegion({ latitude: cLat, longitude: cLng, latitudeDelta: dLat * 1.3, longitudeDelta: dLng * 1.3 }, 800);
     triggerHaptic('success');
+    setCropCoordsText('');
   };
 
   const startCropDrawMode = () => {
@@ -446,6 +465,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
     setCropAreaMode('draw'); // ensure mode stays draw
     console.log('[AgroCrop] Trazado finalizado:', polygonCoords.length, 'vertices');
     if (polygonCoords.length >= 3) {
+      AsyncStorage.setItem('lastPolygon', JSON.stringify(polygonCoords));
       setShowSavePolygonModal(true);
     }
   };
@@ -530,7 +550,13 @@ _Datos: ESA Copernicus, NASA, USGS_`;
         `${ocr.datos?.superficie_ha ? ocr.datos.superficie_ha + ' ha' : ''}\n` +
         `${ocr.datos?.propietario || ''}\n` +
         `Confianza: ${ocr.confianza || '?'}`,
-        [{ text: 'Analizar', onPress: () => startCropAnalysis() }, { text: 'Ver en mapa' }]
+        [{ text: 'Analizar', onPress: () => {
+          Alert.alert('Tipo de cultivo', 'Selecciona el cultivo de esta parcela', [
+            { text: 'Maiz Riego', onPress: () => { setCropTipoCultivo('maiz_riego'); startCropAnalysis(); } },
+            { text: 'Mango Ataulfo', onPress: () => { setCropTipoCultivo('mango_ataulfo'); startCropAnalysis(); } },
+            { text: 'Otro cultivo', onPress: () => { setShowCropModal(true); } },
+          ]);
+        }}, { text: 'Ver en mapa' }]
       );
     } catch (e: any) {
       Alert.alert('Error', e.message);
@@ -683,7 +709,14 @@ _Datos: ESA Copernicus, NASA, USGS_`;
     const startWatching = async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        setErrorMsg('Permisos de GPS denegados');
+        Alert.alert(
+          'GPS Requerido',
+          'AgroCrop necesita tu ubicacion para funcionar. Habilita el GPS en Ajustes.',
+          [
+            { text: 'Abrir Ajustes', onPress: () => Linking.openSettings() },
+            { text: 'Reintentar', onPress: () => startWatching() },
+          ]
+        );
         return;
       }
       try {
@@ -801,16 +834,10 @@ _Datos: ESA Copernicus, NASA, USGS_`;
     }
   };
 
-  // Calc stats
+  // Calc stats (memoized)
   const resolvedPolygonCoords = polygonCoords;
-  let areaM2 = 0;
-  let infoText = "";
-
-  if (resolvedPolygonCoords.length > 2) {
-    areaM2 = calcPolygonArea(resolvedPolygonCoords);
-    infoText = `${resolvedPolygonCoords.length} pts`;
-  }
-
+  const areaM2 = useMemo(() => polygonCoords.length > 2 ? calcPolygonArea(polygonCoords) : 0, [polygonCoords]);
+  const infoText = polygonCoords.length > 2 ? `${polygonCoords.length} pts` : "";
   const areaHa = (areaM2 / 10000).toFixed(2);
   const areaKm2 = (areaM2 / 1000000).toFixed(4);
   const showStatsBox = areaM2 > 0;
@@ -863,7 +890,11 @@ _Datos: ESA Copernicus, NASA, USGS_`;
           followsUserLocation={false}
           showsCompass={false}
           region={mapCenter || undefined}
-          onRegionChange={(region: any) => { if (region.heading !== undefined) { setMapRotation(region.heading); } setCurrentZoom(region.latitudeDelta); }}
+          onRegionChange={(region: any) => {
+            if (region.heading !== undefined) { setMapRotation(region.heading); }
+            if (zoomTimeoutRef.current) clearTimeout(zoomTimeoutRef.current);
+            zoomTimeoutRef.current = setTimeout(() => setCurrentZoom(region.latitudeDelta), 200);
+          }}
           onRegionChangeComplete={handleRegionChangeComplete}
           onPress={handleMapPress}
         >
@@ -989,7 +1020,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
 
         {/* VERSION TAG */}
         <View style={styles.versionTag}>
-          <Text style={styles.versionTagText}>AgroCrop v2.2</Text>
+          <Text style={styles.versionTagText}>AgroCrop v2.3</Text>
         </View>
 
         {/* FLOATING MAP CONTROLS (RIGHT) */}
@@ -1091,7 +1122,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
               {chatMessages.length === 0 && (
                 <Text style={styles.chatEmpty}>Soy tu asistente agronomo. Preguntame sobre cultivos, indices vegetativos, plagas, riego o fenologia.</Text>
               )}
-              {chatMessages.map((msg, idx) => (
+              {chatMessages.slice(-20).map((msg, idx) => (
                 <View key={idx} style={[styles.chatBubble, msg.role === 'user' ? styles.chatBubbleUser : styles.chatBubbleAssistant]}>
                   <Text style={[styles.chatBubbleText, msg.role === 'user' ? styles.chatBubbleTextUser : styles.chatBubbleTextAssistant]}>{msg.content}</Text>
                 </View>
