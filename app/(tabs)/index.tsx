@@ -125,6 +125,7 @@ export default function AgroCropDashboard() {
   const [ocrProcessing, setOcrProcessing] = useState(false);
   const [cropExtended, setCropExtended] = useState<BiomassExtendedResult | null>(null);
   const [cropExtendedLoading, setCropExtendedLoading] = useState(false);
+  const [cropCellSizeM, setCropCellSizeM] = useState(1000);
 
   // NEW: Photo options state
   const [showPhotoOptions, setShowPhotoOptions] = useState(false);
@@ -269,8 +270,9 @@ export default function AgroCropDashboard() {
         setCropStep('Construyendo mapa de calor...');
         const gridResult = await getBiomassGrid(geeCoords, cropFechaInicio, cropFechaFin);
         setCropGridCells(gridResult.grid);
+        if (gridResult.cell_size_m) setCropCellSizeM(gridResult.cell_size_m);
         setShowCropHeatmap(true);
-        console.log('[AgroCrop] Grid recibido:', gridResult.grid.length, 'celdas');
+        console.log('[AgroCrop] Grid recibido:', gridResult.grid.length, 'celdas, celda:', gridResult.cell_size_m || '?', 'm');
       } catch (gridErr: any) {
         console.warn('[AgroCrop] Grid failed:', gridErr.message);
       } finally {
@@ -390,7 +392,7 @@ ${(cropData as any).proyeccion ? `
 ━━━━━━━━━━━━━━━━━
 ${mangoSection}
 
-🤖 _Generado con AgroCrop v2.5_
+🤖 _Generado con AgroCrop v2.6_
 _Datos: ESA Copernicus, NASA, USGS_`;
 
       await Share.share({
@@ -642,18 +644,9 @@ _Datos: ESA Copernicus, NASA, USGS_`;
   // ── Heatmap grid polygon data (memoized) ────────────────────────────────
   const cropGridPolygons = useMemo(() => {
     if (!cropGridCells.length) return [];
-    // Detect cell size from spacing between first two cells in same row
-    let halfDeg = 0.0045;
-    if (cropGridCells.length >= 2) {
-      const sorted = [...cropGridCells].sort((a, b) => a.lat === b.lat ? a.lng - b.lng : a.lat - b.lat);
-      for (let i = 1; i < sorted.length; i++) {
-        if (Math.abs(sorted[i].lat - sorted[i - 1].lat) < 0.001) {
-          halfDeg = Math.abs(sorted[i].lng - sorted[i - 1].lng) / 2;
-          break;
-        }
-      }
-    }
-    console.log('[AgroCrop] Renderizando', cropGridCells.length, 'poligonos en mapa, halfDeg:', halfDeg.toFixed(5));
+    // Calculate halfDeg from actual cell size in meters
+    const halfDeg = (cropCellSizeM / 1000) / 111.32 / 2;
+    console.log('[AgroCrop] Renderizando', cropGridCells.length, 'celdas, celda:', cropCellSizeM, 'm, halfDeg:', halfDeg.toFixed(5));
     return cropGridCells.map((cell, i) => ({
       key: `hm-${i}`,
       coords: [
@@ -667,7 +660,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
       lat: cell.lat,
       lng: cell.lng,
     }));
-  }, [cropGridCells]);
+  }, [cropGridCells, cropCellSizeM]);
 
   // Stable viewport ref — avoids re-renders during pan/zoom
   const viewportRef = useRef<Region | null>(null);
@@ -705,7 +698,8 @@ _Datos: ESA Copernicus, NASA, USGS_`;
 
   // Live zoom level for label visibility (updated during pan/zoom)
   const [currentZoom, setCurrentZoom] = useState(0.5);
-  const showGridLabels = currentZoom < 0.5 && visibleGridPolygons.length <= 200;
+  const zoomMinLabels = cropCellSizeM < 200 ? 0.05 : cropCellSizeM < 500 ? 0.15 : cropCellSizeM < 1000 ? 0.30 : 0.50;
+  const showGridLabels = currentZoom < zoomMinLabels && visibleGridPolygons.length <= 200;
 
   const triggerHaptic = (type: 'light' | 'medium' | 'heavy' | 'success') => {
     if (!vibrationEnabled) return;
@@ -1034,7 +1028,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
 
         {/* VERSION TAG */}
         <View style={styles.versionTag}>
-          <Text style={styles.versionTagText}>AgroCrop v2.5</Text>
+          <Text style={styles.versionTagText}>AgroCrop v2.6</Text>
         </View>
 
         {/* FLOATING MAP CONTROLS (RIGHT) */}
@@ -1708,6 +1702,16 @@ _Datos: ESA Copernicus, NASA, USGS_`;
                   <View style={{ alignItems: 'center', paddingVertical: 10 }}>
                     <ActivityIndicator size="small" color={COLORS.verdeClaro} />
                     <Text style={{ color: '#999', fontSize: 12, marginTop: 5 }}>Cargando analisis IA...</Text>
+                  </View>
+                )}
+
+                {/* Grid precision info */}
+                {cropGridCells.length > 0 && (
+                  <View style={{ backgroundColor: '#F5F5F5', borderRadius: 10, padding: 10, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ fontSize: 16 }}>🗺️</Text>
+                    <Text style={{ color: '#666', fontSize: 12 }}>
+                      Precision: 1 celda = {Math.round(cropCellSizeM * cropCellSizeM / 10000 * 10) / 10} ha ({cropCellSizeM}m x {cropCellSizeM}m) - {cropGridCells.length} celdas
+                    </Text>
                   </View>
                 )}
 

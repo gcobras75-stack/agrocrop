@@ -606,6 +606,9 @@ export interface BiomassGridResult {
   total_celdas: number;
   celdas_con_cultivo: number;
   cell_size_km: number;
+  cell_size_m?: number;
+  ha_por_celda?: number;
+  area_km2?: number;
   resumen: {
     tonelaje_total: number;
     hectareas_con_cultivo: number;
