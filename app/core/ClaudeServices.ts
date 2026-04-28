@@ -282,37 +282,35 @@ export async function analyzeCropBiomassWithClaude(
 - Cultivo: ${tipoCultivo}`;
 
   const prompt = isMango
-    ? `Eres agronomo experto en produccion de mango en Escuinapa, Sinaloa (zona #1 productora de Ataulfo en Mexico).
-Analiza estos datos de una huerta de ${tipoCultivo}:
+    ? `Eres agronomo experto en produccion de mango en Sinaloa (Escuinapa, Rosario).
+Analiza estos datos satelitales de una huerta de ${tipoCultivo}:
+
+ESTADO ACTUAL (imagen satelital):
 ${baseData}
 
-Proporciona:
-1. Estado sanitario del huerto (vigor follaje, densidad copa)
-2. Estimacion de cosecha en toneladas (rango)
-3. Si en floracion (Ene-Feb): pronostico de cuaje
-4. Si en cuaje (Feb-Mar): riesgo de aborto floral
-5. Si en desarrollo (Mar-May): tamano esperado de fruto
-6. Recomendaciones especificas:
-   - Riego (cantidad y frecuencia)
-   - Fertilizacion foliar
-   - Control de antracnosis (Colletotrichum)
-   - Control de mosca de la fruta
-7. Comparativo con promedio Escuinapa: Ataulfo 12, Kent 14, Tommy 16 ton/ha
-8. Valor estimado de cosecha en MXN (Ataulfo $9,500, Kent $11,200, Tommy $7,800/ton)
+Proporciona en MAXIMO 8 parrafos cortos:
+1. Estado sanitario del huerto y si esta EN BUEN CAMINO para la cosecha
+2. Estimacion de cosecha en toneladas (rango realista)
+3. El RIESGO PRINCIPAL que podria reducir la produccion (sequia, antracnosis, mosca, calor)
+4. 3 acciones CONCRETAS para las proximas semanas
+5. Comparativo con promedio Escuinapa: Ataulfo 12, Kent 14, Tommy 16 ton/ha
+6. Si la proyeccion de ${stats.rendimiento_por_hectarea} ton/ha es REALISTA para esta temporada
 
-Responde en espanol tecnico pero comprensible.`
-    : `Eres un agronomo experto en cultivos de maiz del Valle de Culiacan, Sinaloa.
-Analiza estos datos de ${tipoCultivo}:
+Responde en espanol sencillo para productor en campo. Sin jerga excesiva.`
+    : `Eres agronomo experto en cultivos de Sinaloa (Valle de Culiacan, Los Mochis).
+Analiza estos datos satelitales de ${tipoCultivo}:
+
+ESTADO ACTUAL (imagen satelital):
 ${baseData}
 
-Proporciona:
-1. Diagnostico del estado actual del cultivo
-2. Estimacion de produccion con rango min-max en toneladas
-3. Factores de riesgo (estres hidrico, deficit nutricional)
-4. Recomendaciones de manejo agronomico para esta zona
-5. Comparacion con promedio historico del Valle de Culiacan
+Proporciona en MAXIMO 8 parrafos cortos:
+1. Diagnostico: esta el cultivo en buen camino? Que senales ves?
+2. RIESGO PRINCIPAL que podria reducir la proyeccion (sequia, plaga, temperatura)
+3. 3 acciones CONCRETAS para mejorar el rendimiento en las proximas semanas
+4. Es la proyeccion de ${stats.rendimiento_por_hectarea} ton/ha REALISTA para ${tipoCultivo} en Sinaloa?
+5. Comparacion con promedio historico de la region (maiz riego ~9.5, temporal ~4.5 ton/ha)
 
-Responde en espanol tecnico pero comprensible.`;
+Responde en espanol sencillo para productor en campo. Sin jerga excesiva.`;
 
   const payload = {
     model: MODEL_SMART,
