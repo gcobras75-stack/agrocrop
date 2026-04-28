@@ -6,8 +6,6 @@ import * as Location from 'expo-location';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
 import * as ImagePicker from 'expo-image-picker';
 import NetInfo from '@react-native-community/netinfo';
 import { initDB } from '../core/Database';
@@ -16,7 +14,7 @@ import { getBiomassAnalysis, BiomassAnalysisResult, generateCirclePolygon, getBi
 import { AgroCropPolygon, generatePolygonId, getPolygonColor, extractCoordsFromPhoto, calcConsolidatedSummary } from '../core/AgroCropService';
 
 type Coordinate = { latitude: number; longitude: number };
-type DrawingType = 'none' | 'polygon' | 'rectangle';
+type DrawingType = 'none' | 'polygon';
 
 // --- GEO CALCULATIONS ---
 
@@ -47,7 +45,6 @@ export default function AgroCropDashboard() {
   const mapRef = useRef<MapView>(null);
   
   // --- Chat IA ---
-  const [isAdminMode, setIsAdminMode] = useState(false);
   const [showChatModal, setShowChatModal] = useState(false);
   const [chatMessages, setChatMessages] = useState<{role: string, content: string}[]>([]);
   const [chatInput, setChatInput] = useState('');
@@ -325,7 +322,7 @@ ${(cropData as any).proyeccion ? `
 ━━━━━━━━━━━━━━━━━
 ${mangoSection}
 
-🤖 _Generado con ProspectorAI v8.0_
+🤖 _Generado con AgroCrop v1.0_
 _Datos: ESA Copernicus, NASA, USGS_`;
 
       await Share.share({
@@ -839,7 +836,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
         {!showStatsBox && (
           <View style={[styles.panel, styles.topPanel, { borderRadius: 12}]}>
             <View style={styles.row}>
-              <MaterialCommunityIcons name="satellite-variant" size={16} color="#FFD700" />
+              <MaterialCommunityIcons name="satellite-variant" size={16} color="#2d7a2d" />
               <Text style={[styles.titleText, {fontSize: 11}]}> GPS: LAT {latitude.toFixed(4)} | LON {longitude.toFixed(4)}</Text>
             </View>
           </View>
@@ -864,7 +861,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.locationButton} onPress={() => { if (location) { mapRef.current?.animateToRegion({ latitude: location.coords.latitude, longitude: location.coords.longitude, latitudeDelta: 0.005, longitudeDelta: 0.005 }, 500); } }}><MaterialCommunityIcons name="crosshairs-gps" size={24} color="#FFD700" /></TouchableOpacity>
+        <TouchableOpacity style={styles.locationButton} onPress={() => { if (location) { mapRef.current?.animateToRegion({ latitude: location.coords.latitude, longitude: location.coords.longitude, latitudeDelta: 0.005, longitudeDelta: 0.005 }, 500); } }}><MaterialCommunityIcons name="crosshairs-gps" size={24} color="#2d7a2d" /></TouchableOpacity>
 
         {/* AgroCrop heatmap legend toggle + legend */}
         {cropGridCells.length > 0 && (
@@ -894,7 +891,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
           </View>
         )}
 
-        <TouchableOpacity style={styles.northIndicator} onPress={() => { triggerHaptic('heavy'); setShowChatModal(true); }} onLongPress={() => { triggerHaptic('heavy'); setShowChatModal(true); }}><View style={[styles.northArrow, { transform: [{ rotate: `${-mapRotation}deg` }] }]}><MaterialCommunityIcons name="arrow-up" size={28} color="#FFD700" /><Text style={styles.northText}>N</Text></View></TouchableOpacity>
+        <TouchableOpacity style={styles.northIndicator} onPress={() => { triggerHaptic('heavy'); setShowChatModal(true); }} onLongPress={() => { triggerHaptic('heavy'); setShowChatModal(true); }}><View style={[styles.northArrow, { transform: [{ rotate: `${-mapRotation}deg` }] }]}><MaterialCommunityIcons name="arrow-up" size={28} color="#2d7a2d" /><Text style={styles.northText}>N</Text></View></TouchableOpacity>
 
         {/* CONNECTION & SPECTRAL INDICATOR (TOP RIGHT) */}
         <View style={{ position: 'absolute', top: 50, right: 10, backgroundColor: 'rgba(0,0,0,0.7)', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 16, flexDirection: 'row', alignItems: 'center', zIndex: 30, borderWidth: 1, borderColor: '#333' }}>
@@ -903,8 +900,8 @@ _Datos: ESA Copernicus, NASA, USGS_`;
              <Text style={{color: '#FFF', fontSize: 10, fontWeight: 'bold'}}>Online</Text>
            </TouchableOpacity>
            <View style={{width: 1, height: 12, backgroundColor: '#555', marginHorizontal: 8}} />
-           <TouchableOpacity onPress={() => setShowHeatmap(!showHeatmap)} style={{flexDirection: 'row', alignItems: 'center'}}>
-             <Text style={{color: showHeatmap ? '#FFD700' : '#888', fontSize: 10, fontWeight: 'bold'}}>🌈 Capa {showHeatmap ? 'ON' : 'OFF'}</Text>
+           <TouchableOpacity onPress={() => setShowCropHeatmap(!showCropHeatmap)} style={{flexDirection: 'row', alignItems: 'center'}}>
+             <Text style={{color: showCropHeatmap ? '#4CAF50' : '#888', fontSize: 10, fontWeight: 'bold'}}>Capa {showCropHeatmap ? 'ON' : 'OFF'}</Text>
            </TouchableOpacity>
         </View>
 
@@ -927,95 +924,62 @@ _Datos: ESA Copernicus, NASA, USGS_`;
       </View>
 
       {/* 30% CONSOLA DE MANDO INFERIOR */}
-      <View style={[styles.consoleContainer, isFieldMode && { backgroundColor: '#F0F0F0', borderTopColor: '#000' }]}>
-        
-        {/* BARRA DE HERRAMIENTAS PERMANENTE */}
-        <View style={[{ width: '100%', backgroundColor: '#000', borderBottomWidth: 1, borderBottomColor: '#FFD700', paddingVertical: 8 }, isFieldMode && { backgroundColor: '#E0E0E0', borderBottomColor: '#000' }]}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, gap: 8 }}>
-            
-            <TouchableOpacity 
-              style={[{ width: 55, height: 55, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111', borderRadius: 8, borderWidth: 1, borderColor: '#FFD700' }, drawingType === 'polygon' && { backgroundColor: '#FFD700' }, isFieldMode && { backgroundColor: '#FFF', borderColor: '#000' }]} 
-              onPress={() => drawingType === 'polygon' ? selectMode('none') : selectMode('polygon')}
+      <View style={styles.consoleContainer}>
+
+        {/* BARRA DE HERRAMIENTAS AGROCROP */}
+        <View style={{ width: '100%', backgroundColor: '#000', borderBottomWidth: 1, borderBottomColor: '#2d7a2d', paddingVertical: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, gap: 12 }}>
+
+            <TouchableOpacity
+              style={{ flex: 1, height: 55, justifyContent: 'center', alignItems: 'center', backgroundColor: '#2d7a2d', borderRadius: 10, elevation: 5 }}
+              onPress={() => setShowCropModal(true)}
             >
-              <MaterialCommunityIcons name="draw-pen" size={20} color={drawingType === 'polygon' ? '#000' : (isFieldMode ? '#000' : '#FFD700')} />
-              <Text style={[{ color: '#FFD700', fontSize: 11, fontWeight: 'bold', marginTop: 4 }, drawingType === 'polygon' && { color: '#000' }, isFieldMode && drawingType !== 'polygon' && { color: '#000' }]}>
-                {drawingType === 'polygon' ? 'Trazando' : 'Trazar'}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[{ width: 55, height: 55, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111', borderRadius: 8, borderWidth: 1, borderColor: '#FFD700' }, isFieldMode && { backgroundColor: '#FFF', borderColor: '#000' }]} onPress={() => setShowWaypointModal(true)}>
-               <MaterialCommunityIcons name="camera-plus" size={20} color={isFieldMode ? "#000" : "#FFD700"} />
-               <Text style={[{ color: '#FFD700', fontSize: 11, fontWeight: 'bold', marginTop: 4 }, isFieldMode && { color: '#000' }]}>Cámara</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[{ width: 55, height: 55, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111', borderRadius: 8, borderWidth: 1, borderColor: '#FFD700' }, isFieldMode && { backgroundColor: '#FFF', borderColor: '#000' }]} onPress={() => setShowTopoModal(true)}>
-               <MaterialCommunityIcons name="terrain" size={20} color={isFieldMode ? "#000" : (showTopoLayer ? "#00FFFF" : "#FFD700")} />
-               <Text style={[{ color: '#FFD700', fontSize: 11, fontWeight: 'bold', marginTop: 4 }, isFieldMode && { color: '#000' }, showTopoLayer && { color: '#00FFFF' }]}>Curvas</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[{ width: 55, height: 55, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111', borderRadius: 8, borderWidth: 1, borderColor: '#FFD700' }, isFieldMode && { backgroundColor: '#FFF', borderColor: '#000' }]} onPress={() => setIsFieldMode(!isFieldMode)}>
-               <MaterialCommunityIcons name={isFieldMode ? "weather-night" : "white-balance-sunny"} size={20} color={isFieldMode ? "#000" : "#888"} />
-               <Text style={[{ color: '#FFD700', fontSize: 11, fontWeight: 'bold', marginTop: 4 }, isFieldMode && { color: '#000' }]}>{isFieldMode ? 'Noche' : 'Solar'}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[{ width: 55, height: 55, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111', borderRadius: 8, borderWidth: 1, borderColor: '#FFD700' }, isFieldMode && { backgroundColor: '#FFF', borderColor: '#000' }]} onPress={() => setShowHistoryModal(true)}>
-               <MaterialCommunityIcons name="history" size={20} color={isFieldMode ? "#000" : "#FFD700"} />
-               <Text style={[{ color: '#FFD700', fontSize: 11, fontWeight: 'bold', marginTop: 4 }, isFieldMode && { color: '#000' }]}>Historial</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={[{ width: 55, height: 55, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111', borderRadius: 8, borderWidth: 1, borderColor: '#FFD700' }, isFieldMode && { backgroundColor: '#FFF', borderColor: '#000' }]} onPress={() => setShowConfigModal(true)}>
-               <MaterialCommunityIcons name="cog" size={20} color={isFieldMode ? "#000" : "#FFD700"} />
-               <Text style={[{ color: '#FFD700', fontSize: 11, fontWeight: 'bold', marginTop: 4 }, isFieldMode && { color: '#000' }]}>Ajustes</Text>
+              <MaterialCommunityIcons name="corn" size={22} color="#FFF" />
+              <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '900', marginTop: 2 }}>ANALIZAR</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[{ width: 55, height: 55, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111', borderRadius: 8, borderWidth: 1, borderColor: '#4CAF50' }, isFieldMode && { backgroundColor: '#FFF', borderColor: '#2E7D32' }]}
-              onPress={() => setShowCropModal(true)}
+              style={{ width: 55, height: 55, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111', borderRadius: 8, borderWidth: 1, borderColor: '#333' }}
+              onPress={() => setShowConfigModal(true)}
             >
-               <MaterialCommunityIcons name="corn" size={20} color={isFieldMode ? "#2E7D32" : "#4CAF50"} />
-               <Text style={[{ color: '#4CAF50', fontSize: 9, fontWeight: 'bold', marginTop: 4 }, isFieldMode && { color: '#2E7D32' }]}>AgroCrop</Text>
+              <MaterialCommunityIcons name="cog" size={20} color="#888" />
+              <Text style={{ color: '#888', fontSize: 9, fontWeight: 'bold', marginTop: 2 }}>Ajustes</Text>
             </TouchableOpacity>
 
-          </ScrollView>
+          </View>
         </View>
 
         {/* ÁREA DINÁMICA DE TRABAJO */}
         <View style={styles.consoleContentArea}>
           {drawingType === 'polygon' ? (
              <View style={styles.actionBox}>
-               <Text style={[styles.instructionText, isFieldMode && { color: '#333' }, {fontSize: 10, marginBottom: 5}]}>NUEVO POLÍGONO ({polygonCoords.length} VERTICES)</Text>
-               
+               <Text style={[styles.instructionText, {fontSize: 10, marginBottom: 5, color: '#4CAF50'}]}>TRAZANDO POLIGONO ({polygonCoords.length} VERTICES)</Text>
+
                <View style={{ flexDirection: 'row', width: '100%', alignItems: 'center', marginTop: 5, paddingHorizontal: 10, gap: 8 }}>
                  <TouchableOpacity
-                   style={[
-                     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 48, borderRadius: 8, borderWidth: 2, borderColor: '#000', backgroundColor: '#FFD700', elevation: 5 },
-                     isFieldMode ? { backgroundColor: '#FFFFFF', borderColor: '#000000' } : null,
-                   ]}
+                   style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 48, borderRadius: 8, borderWidth: 2, borderColor: '#000', backgroundColor: '#2d7a2d', elevation: 5 }}
                    onPress={addPointFromCrosshair}
                  >
-                    <MaterialCommunityIcons name="target" size={20} color="#000" />
-                    <Text style={{ color: '#000', fontWeight: '900', fontSize: 11, marginLeft: 6 }}> MARCAR PUNTO ({polygonCoords.length})</Text>
+                    <MaterialCommunityIcons name="target" size={20} color="#FFF" />
+                    <Text style={{ color: '#FFF', fontWeight: '900', fontSize: 11, marginLeft: 6 }}>MARCAR PUNTO ({polygonCoords.length})</Text>
                  </TouchableOpacity>
 
                  {polygonCoords.length >= 3 && (
                    <TouchableOpacity
-                     style={[
-                       { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 48, borderRadius: 8, borderWidth: 2, borderColor: '#000', backgroundColor: '#FFD700', elevation: 5 },
-                       isFieldMode ? { backgroundColor: '#FFFFFF', borderColor: '#000000' } : null,
-                     ]}
+                     style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 48, borderRadius: 8, borderWidth: 2, borderColor: '#000', backgroundColor: '#f5c518', elevation: 5 }}
                      onPress={() => finishDrawing()}
                    >
-                      <MaterialCommunityIcons name="radar" size={20} color="#000" />
-                      <Text style={{ color: '#000', fontWeight: '900', fontSize: 11, marginLeft: 6 }}> ANALIZAR POLÍGONO</Text>
+                      <MaterialCommunityIcons name="check" size={20} color="#000" />
+                      <Text style={{ color: '#000', fontWeight: '900', fontSize: 11, marginLeft: 6 }}>FINALIZAR</Text>
                    </TouchableOpacity>
                  )}
                </View>
 
                <View style={{ flexDirection: 'row', width: '100%', justifyContent: 'space-between', marginTop: 8, paddingHorizontal: 10 }}>
-                 <TouchableOpacity style={[styles.cancelDrawBtn, isFieldMode ? { backgroundColor: '#FFFFFF', borderColor: '#FF3B30', borderWidth: 2 } : null, { flex: 1, marginRight: 8, height: 35, borderRadius: 8, justifyContent: 'center', padding: 0, marginTop: 0 }]} onPress={() => setPolygonCoords([])}>
+                 <TouchableOpacity style={[styles.cancelDrawBtn, { flex: 1, marginRight: 8, height: 35, borderRadius: 8, justifyContent: 'center', padding: 0, marginTop: 0 }]} onPress={() => setPolygonCoords([])}>
                     <Text style={[styles.cancelDrawText, { textAlign: 'center', fontSize: 10 }]}>LIMPIAR</Text>
                  </TouchableOpacity>
-                 <TouchableOpacity style={[styles.cancelDrawBtn, isFieldMode ? { backgroundColor: '#FFFFFF', borderColor: '#FF3B30', borderWidth: 2 } : null, { flex: 1, height: 35, borderRadius: 8, justifyContent: 'center', padding: 0, marginTop: 0 }]} onPress={() => selectMode('none')}>
+                 <TouchableOpacity style={[styles.cancelDrawBtn, { flex: 1, height: 35, borderRadius: 8, justifyContent: 'center', padding: 0, marginTop: 0 }]} onPress={() => selectMode('none')}>
                     <Text style={[styles.cancelDrawText, { textAlign: 'center', fontSize: 10 }]}>SALIR</Text>
                  </TouchableOpacity>
                </View>
@@ -1024,624 +988,61 @@ _Datos: ESA Copernicus, NASA, USGS_`;
              <View style={styles.actionBox}>
                {(polygonCoords.length >= 3) ? (
                  <>
-                   <Text style={[styles.instructionText, isFieldMode && { color: '#444' }, { fontSize: 10, marginBottom: 5 }]}>ZONA CARGADA: {selectedMineral.toUpperCase()}</Text>
-                   <View style={{flexDirection: 'row', width: '100%', justifyContent: 'center', gap: 8, paddingHorizontal: 10}}>
-                     <Pressable 
-                       style={({ pressed }) => [{ backgroundColor: '#FFD700', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 40, flex: 1, borderRadius: 8, borderWidth: 1, borderColor: '#000' }, isFieldMode ? { backgroundColor: '#FFFFFF', borderColor: '#000000', borderWidth: 2 } : null, pressed && { opacity: 0.7 }, isAnalyzing && { backgroundColor: '#555' }]} 
-                       onPress={() => analyzeZone()} 
-                       disabled={isAnalyzing}
-                     >
-                       {isAnalyzing ? <ActivityIndicator color={isFieldMode ? "#000" : "#FFF"} size="small" /> : <MaterialCommunityIcons name="brain" size={16} color="#000" />}
-                       <Text style={[{ color: '#000', fontWeight: 'bold', fontSize: 10, marginLeft: 5 }, isFieldMode ? { color: '#000000' } : null]}>{isAnalyzing ? ' CALCULANDO...' : ' ANALIZAR ZONA CARGADA'}</Text>
-                     </Pressable>
-                     <TouchableOpacity style={[{ backgroundColor: 'rgba(255, 60, 60, 0.2)', borderWidth: 1, borderColor: '#FF3B30', height: 40, flex: 0.5, borderRadius: 8, justifyContent: 'center', alignItems: 'center' }, isFieldMode ? { backgroundColor: '#FFFFFF', borderColor: '#FF3B30', borderWidth: 2 } : null]} onPress={clearShapes}>
-                        <Text style={[{ color: '#FF3B30', fontWeight: 'bold', fontSize: 10 }]}>BORRAR</Text>
-                     </TouchableOpacity>
-                   </View>
+                   <Text style={[styles.instructionText, { fontSize: 10, marginBottom: 5, color: '#4CAF50' }]}>AREA LISTA ({(calcPolygonArea(polygonCoords) / 10000).toFixed(0)} ha)</Text>
+                   <TouchableOpacity
+                     style={{ backgroundColor: '#2d7a2d', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 44, width: '80%', borderRadius: 10, elevation: 5 }}
+                     onPress={() => { setShowCropModal(false); startCropAnalysis(); }}
+                   >
+                     <MaterialCommunityIcons name="satellite-uplink" size={18} color="#FFF" />
+                     <Text style={{ color: '#FFF', fontWeight: '900', fontSize: 13, marginLeft: 8 }}>ANALIZAR AREA</Text>
+                   </TouchableOpacity>
+                   <TouchableOpacity style={{ marginTop: 8 }} onPress={clearShapes}>
+                     <Text style={{ color: '#FF5555', fontSize: 10 }}>Borrar poligono</Text>
+                   </TouchableOpacity>
                  </>
                ) : (
-                 <Text style={[styles.instructionText, { color: '#888' }]}>Toca "Trazar" para delimitar una zona de 3 vértices</Text>
+                 <View style={{ alignItems: 'center', paddingHorizontal: 20 }}>
+                   <Text style={{ color: '#4CAF50', fontSize: 16, fontWeight: '900', marginBottom: 4 }}>Bienvenido a AgroCrop</Text>
+                   <Text style={{ color: '#888', fontSize: 12, textAlign: 'center', marginBottom: 8 }}>Analisis satelital de cultivos en tiempo real</Text>
+                   <Text style={{ color: '#666', fontSize: 11, textAlign: 'center' }}>Toca el boton verde "ANALIZAR" para empezar</Text>
+                 </View>
                )}
              </View>
           )}
         </View>
       </View>
 
-      {showResults && (() => {
-        // Regional average for the selected mineral (from grid points)
-        const regionalAvg = analysisPoints.length > 0
-          ? analysisPoints.reduce((s, p) => s + (p.base_score || 0), 0) / analysisPoints.length
-          : undefined;
-        // Global max for selected mineral (for ranking section)
-        const selMs = metalScores.find(ms => ms.metal === selectedMineral);
-        const selGlobalMax = selMs?.score_maximo ?? 100;
-        const selColor = METAL_COLORS[selectedMineral] ?? '#FFD700';
-
-        return (
-          <View style={styles.resultsPanel}>
-            {/* ── Header ─────────────────────────────────────────────────── */}
-            <View style={styles.resultsHeader}>
-              <View>
-                <Text style={styles.resultsTitle}>📊 ANÁLISIS MINERAL</Text>
-                <Text style={{color: '#666', fontSize: 10, marginTop: 1}}>
-                  {selectedMineral.toUpperCase()} · {terrainType.toUpperCase()}
-                  {analysisPoints.length > 0 ? `  ·  ${analysisPoints.length} puntos` : ''}
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowResults(false)}>
-                <MaterialCommunityIcons name="close" size={24} color="#FFD700" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={{maxHeight: 400}} showsVerticalScrollIndicator={false}>
-
-              {/* ── ScoreCards por metal ──────────────────────────────────── */}
-              {metalScores.map((ms) => (
-                <ScoreCard
-                  key={ms.metal}
-                  metal={ms.metal}
-                  terrain={terrainType}
-                  metalLabel={ms.label}
-                  metalIcon={ms.icon}
-                  pointScore={ms.score_poligono}
-                  globalMax={ms.score_maximo}
-                  regionalAvg={ms.metal === selectedMineral ? regionalAvg : undefined}
-                  guideMineral={ms.guideMineral}
-                  warning={ms.warning}
-                />
-              ))}
-
-              {/* ── Ranking comparativo ────────────────────────────────────── */}
-              {analysisPoints.length > 0 && (
-                <View style={styles.rankingSection}>
-                  <View style={styles.rankingHeader}>
-                    <Text style={styles.rankingTitle}>
-                      TUS MEJORES PUNTOS — {selectedMineral.toUpperCase()} {terrainType.toUpperCase()}
-                    </Text>
-                    <Text style={styles.rankingMaxLabel}>
-                      Máx: <Text style={{color: selColor, fontWeight: '900'}}>{selGlobalMax}</Text>/100
-                    </Text>
-                  </View>
-
-                  {analysisPoints.slice(0, 5).map((p, i) => {
-                    const score = Math.round(p.score || p.base_score || 0);
-                    const pct   = Math.round((score / selGlobalMax) * 100);
-                    return (
-                      <TouchableOpacity
-                        key={i}
-                        style={styles.rankingItem}
-                        onPress={() => {
-                          mapRef.current?.animateToRegion({
-                            latitude: p.lat,
-                            longitude: p.lng,
-                            latitudeDelta: 0.005,
-                            longitudeDelta: 0.005,
-                          }, 500);
-                        }}
-                      >
-                        <Text style={styles.rankingRank}>#{p.rank}</Text>
-                        <View style={{flex: 1, marginHorizontal: 10}}>
-                          <Text style={styles.rankingCoord}>
-                            {p.lat.toFixed(5)}, {p.lng.toFixed(5)}
-                          </Text>
-                          <View style={styles.rankingTrack}>
-                            {/* max ceiling */}
-                            <View style={[styles.rankingCeiling, {width: `${selGlobalMax}%`}]} />
-                            {/* score fill */}
-                            <View style={[styles.rankingFill, {width: `${score}%`, backgroundColor: selColor}]} />
-                          </View>
-                        </View>
-                        <View style={{alignItems: 'flex-end', minWidth: 56}}>
-                          <Text style={[styles.rankingScore, {color: selColor}]}>{score}/100</Text>
-                          <Text style={styles.rankingPct}>{pct}% del máx</Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              )}
-
-              <View style={{height: 14}} />
-            </ScrollView>
-          </View>
-        );
-      })()}
-
-      {/* ── TAP POINT ANALYSIS PANEL ────────────────────────────────────────── */}
-      {tapPoint && (
-        <View style={styles.tapPanel}>
-
-          {/* Header */}
-          <View style={styles.resultsHeader}>
-            <View style={{flex: 1}}>
-              <Text style={styles.resultsTitle}>📍 ANÁLISIS DEL PUNTO</Text>
-              <Text style={{color: '#555', fontSize: 10, marginTop: 2, fontFamily: 'monospace'}}>
-                {tapPoint.lat.toFixed(6)}, {tapPoint.lng.toFixed(6)}
-              </Text>
-              <Text style={{color: '#555', fontSize: 10, marginTop: 1}}>
-                Terreno: {terrainType.charAt(0).toUpperCase() + terrainType.slice(1)}
-                {'  ·  '}Metal activo: {selectedMineral.toUpperCase()}
-              </Text>
-            </View>
-            <TouchableOpacity onPress={() => setTapPoint(null)} hitSlop={{top:10,bottom:10,left:10,right:10}}>
-              <MaterialCommunityIcons name="close" size={24} color="#FFD700" />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={{maxHeight: 420}} showsVerticalScrollIndicator={false}>
-            {(() => {
-              const { lat, lng } = tapPoint;
-              const terrKey = terrainType === 'playa' ? 'playa' : 'sierra';
-              const BARS    = 20;
-
-              return (
-                <>
-                  {/* ── BarRow por cada metal ─────────────────────────── */}
-                  {(['oro', 'plata', 'cobre', 'litio', 'hierro'] as const).map(metal => {
-                    const maxScore = TAP_GLOBAL_MAX[metal]?.[terrKey] ?? 100;
-                    const ptScore  = Math.min(tapPointScore(lat, lng, metal), maxScore);
-                    const pct      = Math.round((ptScore / maxScore) * 100);
-                    const msg      = tapMessage(pct);
-                    const meta     = TAP_METAL_META[metal];
-                    const color    = meta?.color ?? '#FFD700';
-                    const ptBars   = Math.round((ptScore  / 100) * BARS);
-                    const maxBars  = Math.round((maxScore / 100) * BARS);
-
-                    return (
-                      <View key={metal} style={{
-                        marginBottom: 14,
-                        paddingBottom: 14,
-                        borderBottomWidth: 1,
-                        borderBottomColor: '#1C1C1C',
-                      }}>
-                        {/* Metal title */}
-                        <Text style={{
-                          fontWeight: '900', fontSize: 15, color,
-                          marginBottom: 9, letterSpacing: 0.5,
-                        }}>
-                          {meta?.icon}  {meta?.label}
-                        </Text>
-
-                        {/* MAX bar */}
-                        <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 3}}>
-                          <Text style={{fontSize: 11, color: '#666', width: 122}}>
-                            Máximo posible:
-                          </Text>
-                          <Text style={{fontFamily: 'monospace', fontSize: 12, color: '#444', flex: 1}}>
-                            {'█'.repeat(maxBars) + '░'.repeat(BARS - maxBars)}
-                          </Text>
-                          <Text style={{fontSize: 11, color: '#555', width: 46, textAlign: 'right'}}>
-                            {maxScore}/100
-                          </Text>
-                        </View>
-
-                        {/* POINT bar */}
-                        <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 6}}>
-                          <Text style={{fontSize: 11, color: '#999', width: 122}}>
-                            Score aquí:
-                          </Text>
-                          <Text style={{fontFamily: 'monospace', fontSize: 12, color, flex: 1}}>
-                            {'█'.repeat(ptBars) + '░'.repeat(BARS - ptBars)}
-                          </Text>
-                          <Text style={{fontWeight: '900', fontSize: 14, color, width: 46, textAlign: 'right'}}>
-                            {ptScore}/100
-                          </Text>
-                        </View>
-
-                        {/* Percentage + message */}
-                        <Text style={{fontSize: 11, color: msg.color, marginLeft: 122, lineHeight: 16}}>
-                          {'📊 '}{pct}{'% del potencial máximo'}{'\n'}{msg.text}
-                        </Text>
-                      </View>
-                    );
-                  })}
-
-                  {/* ── Indicadores del metal activo ─────────────────── */}
-                  <View style={{
-                    backgroundColor: '#0C0C0C',
-                    borderRadius: 10,
-                    borderWidth: 1,
-                    borderColor: '#252525',
-                    padding: 12,
-                    marginBottom: 8,
-                    marginTop: 4,
-                  }}>
-                    <Text style={{
-                      color: '#AAA', fontWeight: '900', fontSize: 10,
-                      letterSpacing: 1, marginBottom: 10,
-                    }}>
-                      INDICADORES DETECTADOS
-                    </Text>
-                    {getIndicatorsForPoint(lat, lng, selectedMineral, terrainType).map((ind, i) => {
-                      const isOk  = ind.status === '✅';
-                      const isWrn = ind.status === '⚠️';
-                      const clr   = isOk ? '#00C853' : isWrn ? '#FFA500' : '#484848';
-                      return (
-                        <View key={i} style={{
-                          paddingVertical: 7,
-                          borderBottomWidth: i < getIndicatorsForPoint(lat, lng, selectedMineral, terrainType).length - 1 ? 1 : 0,
-                          borderBottomColor: '#1A1A1A',
-                        }}>
-                          <Text style={{fontSize: 13, fontWeight: '600', color: clr}}>
-                            {ind.status}{'  '}{ind.label}
-                          </Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-
-                  <View style={{height: 14}} />
-                </>
-              );
-            })()}
-          </ScrollView>
-        </View>
-      )}
-
-      <Modal visible={!!selectedPoint} transparent animationType="slide">
-        <View style={[styles.modalOverlay, {backgroundColor: 'rgba(0,0,0,0.85)'}]}>
-          <View style={{backgroundColor: '#000', borderColor: '#FFD700', borderWidth: 2, borderRadius: 20, padding: 20, width: '92%', maxHeight: '85%'}}>
-            
-            {/* ── HEADER ─────────────────────────────────────────────────────── */}
-            <View style={{borderBottomWidth: 1, borderBottomColor: '#333', paddingBottom: 10, marginBottom: 14}}>
-              <Text style={{color: '#FFD700', fontSize: 18, fontWeight: '900', letterSpacing: 0.5}}>
-                PUNTO #{selectedPoint?.rank}
-              </Text>
-              <Text style={{color: '#FFF', fontSize: 11, marginTop: 4, fontFamily: 'monospace'}}>
-                📍 Lat: {selectedPoint?.lat.toFixed(6)} | Lng: {selectedPoint?.lng.toFixed(6)}
-              </Text>
-              <Text style={{color: '#888', fontSize: 11, marginTop: 2}}>
-                Terreno: {terrainType.charAt(0).toUpperCase() + terrainType.slice(1)}{'  |  '}Metal: {selectedMineral.toUpperCase()}
-              </Text>
-            </View>
-
-            <ScrollView style={{maxHeight: '100%'}}>
-              {selectedPoint && (() => {
-                const lat     = selectedPoint.lat;
-                const lng     = selectedPoint.lng;
-                const terrKey = terrainType === 'playa' ? 'playa' : 'sierra';
-                const BARS    = 18;
-
-                // Primary metal score → drives recommendation
-                const primMax = TAP_GLOBAL_MAX[selectedMineral]?.[terrKey] ?? 100;
-                const primPt  = Math.min(tapPointScore(lat, lng, selectedMineral), primMax);
-                const primPct = Math.round((primPt / primMax) * 100);
-
-                const recText = primPct >= 80
-                  ? 'Este punto tiene anomalía fuerte. Prioriza la visita de campo. Busca gossan (zona rojiza) y venas de cuarzo en la superficie.'
-                  : primPct >= 65
-                  ? 'Señal positiva confirmada. Planifica visita en tu próxima salida. Lleva lupa y UV.'
-                  : primPct >= 45
-                  ? 'Señal moderada. Registra el punto y compara con otros del área antes de decidir.'
-                  : 'Señal débil. Baja prioridad. Enfoca tu tiempo en los puntos con mayor score.';
-
-                return (
-                  <>
-                    {/* ── Score bars por metal ────────────────────────── */}
-                    {(['oro', 'plata', 'cobre', 'litio', 'hierro'] as const).map(metal => {
-                      const maxScore = TAP_GLOBAL_MAX[metal]?.[terrKey] ?? 100;
-                      const ptScore  = Math.min(tapPointScore(lat, lng, metal), maxScore);
-                      const pct      = Math.round((ptScore / maxScore) * 100);
-                      const msg      = tapMessage(pct);
-                      const meta     = TAP_METAL_META[metal];
-                      const ptBars   = Math.round((ptScore  / 100) * BARS);
-                      const maxBars  = Math.round((maxScore / 100) * BARS);
-
-                      return (
-                        <View key={metal} style={{marginBottom: 13, paddingBottom: 13, borderBottomWidth: 1, borderBottomColor: '#1C1C1C'}}>
-                          <Text style={{fontWeight: '900', fontSize: 14, color: meta?.color ?? '#FFD700', marginBottom: 7, letterSpacing: 0.3}}>
-                            {meta?.icon}{'  '}{meta?.label}
-                          </Text>
-
-                          {/* MAX bar */}
-                          <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 2}}>
-                            <Text style={{fontSize: 10, color: '#555', width: 116}}>Máximo posible:</Text>
-                            <Text style={{fontFamily: 'monospace', fontSize: 11, color: '#3A3A3A', flex: 1}}>
-                              {'░'.repeat(maxBars) + ' '.repeat(BARS - maxBars)}
-                            </Text>
-                            <Text style={{fontSize: 10, color: '#555', width: 44, textAlign: 'right'}}>{maxScore}/100</Text>
-                          </View>
-
-                          {/* POINT bar */}
-                          <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 5}}>
-                            <Text style={{fontSize: 10, color: '#999', width: 116}}>Score de este punto:</Text>
-                            <Text style={{fontFamily: 'monospace', fontSize: 11, color: '#F4D03F', flex: 1}}>
-                              {'█'.repeat(ptBars) + '░'.repeat(BARS - ptBars)}
-                            </Text>
-                            <Text style={{fontWeight: '900', fontSize: 13, color: '#F4D03F', width: 44, textAlign: 'right'}}>{ptScore}/100</Text>
-                          </View>
-
-                          {/* Percentage + message */}
-                          <Text style={{fontSize: 11, color: msg.color, marginLeft: 116, lineHeight: 16}}>
-                            {'📊 '}{pct}{'% del potencial máximo'}{'\n'}{msg.text}
-                          </Text>
-                        </View>
-                      );
-                    })}
-
-                    {/* ── Indicadores ──────────────────────────────────── */}
-                    <View style={{marginTop: 6, marginBottom: 14}}>
-                      <Text style={{color: '#AAA', fontWeight: '900', fontSize: 10, letterSpacing: 1, marginBottom: 8}}>
-                        INDICADORES DETECTADOS
-                      </Text>
-                      {getIndicatorsForPoint(lat, lng, selectedMineral, terrainType).map((ind, i) => {
-                        const isOk  = ind.status === '✅';
-                        const isWrn = ind.status === '⚠️';
-                        const clr   = isOk ? '#00C853' : isWrn ? '#FFA500' : '#484848';
-                        return (
-                          <View key={i} style={{paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: '#1A1A1A'}}>
-                            <Text style={{fontSize: 13, fontWeight: '600', color: clr}}>
-                              {ind.status}{'  '}{ind.label}
-                            </Text>
-                          </View>
-                        );
-                      })}
-                    </View>
-
-                    {/* ── Recomendación automática ─────────────────────── */}
-                    <View style={{marginBottom: 20}}>
-                      <Text style={{color: '#AAA', fontWeight: '900', fontSize: 10, letterSpacing: 1, marginBottom: 6}}>
-                        RECOMENDACIÓN
-                      </Text>
-                      <Text style={{color: '#FFD700', backgroundColor: '#111', padding: 10, borderRadius: 5, fontSize: 12, fontWeight: 'bold', lineHeight: 18, overflow: 'hidden'}}>
-                        {recText}
-                      </Text>
-                    </View>
-                  </>
-                );
-              })()}
-
-              {/* Botones */}
-              <TouchableOpacity style={{backgroundColor: '#FFD700', minWidth: 140, padding: 12, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginBottom: 12}} onPress={() => { 
-                  mapRef.current?.animateToRegion({latitude: selectedPoint?.lat, longitude: selectedPoint?.lng, latitudeDelta: 0.002, longitudeDelta: 0.002}, 800); 
-                  setSelectedPoint(null);
-              }}>
-                 <Text style={{color: '#000', fontWeight: 'bold', fontSize: 14}}>NAVEGAR A COORDENADAS</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={{backgroundColor: '#FFD700', minWidth: 140, padding: 12, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginBottom: 12}} onPress={() => {
-                  mapRef.current?.animateToRegion({latitude: selectedPoint?.lat, longitude: selectedPoint?.lng, latitudeDelta: 0.002, longitudeDelta: 0.002}, 0);
-                  setSampleBase64(null); setAiResult(null); setWaypointNote('');
-                  setShowWaypointModal(true);
-                  setSelectedPoint(null);
-              }}>
-                 <Text style={{color: '#000', fontWeight: 'bold', fontSize: 14}}>GUARDAR COMO MUESTRA</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={{backgroundColor: 'transparent', borderColor: '#FFD700', borderWidth: 2, minWidth: 140, padding: 12, borderRadius: 8, justifyContent: 'center', alignItems: 'center'}} onPress={() => setSelectedPoint(null)}>
-                  <Text style={{color: '#FFD700', fontWeight: 'bold', fontSize: 14}}>CERRAR</Text>
-              </TouchableOpacity>
-              
-              <View style={{height: 20}} />
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* TOPOGRAPHY MODAL */}
-      <Modal visible={showTopoModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, isFieldMode && styles.modalContentLight]}>
-            <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
-               <Text style={[styles.modalTitle, isFieldMode && styles.modalTitleLight, { marginBottom: 0 }]}>📍 CURVAS DE NIVEL</Text>
-               <TouchableOpacity onPress={() => setShowTopoModal(false)}>
-                  <MaterialCommunityIcons name="close" size={28} color={isFieldMode ? "#000" : "#FFD700"} />
-               </TouchableOpacity>
-            </View>
-
-            <View style={[styles.prefsRow, {marginTop: 20}]}>
-              <Text style={[styles.sectionLabelModal, isFieldMode && { color: '#444' }, { marginBottom: 0 }]}>Activar Capa Curvas (OpenTopoMap)</Text>
-              <Switch value={showTopoLayer} onValueChange={setShowTopoLayer} trackColor={{ true: '#00FFFF' }} />
-            </View>
-            
-            <Text style={[styles.sectionLabelModal, isFieldMode && { color: '#444' }]}>OPACIDAD DE LÍNEAS / RELIEVE</Text>
-            <View style={styles.chipsRowModal}>
-              {[0.3, 0.5, 0.7, 1.0].map(op => (
-                <TouchableOpacity key={op.toString()} style={[styles.chipModal, topoOpacity === op && styles.chipActive, {backgroundColor: topoOpacity === op ? '#00FFFF' : '#222'}]} onPress={() => setTopoOpacity(op)}>
-                  <Text style={[styles.chipTextModal, topoOpacity === op && {color: '#000'}]}>{op * 100}%</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            
-            <Text style={{color: '#888', marginTop: 15, fontSize: 12, textAlign: 'justify'}}>
-              Nota técnica: En Expo Go (modo de desarrollo puro), utilizamos la API abierta de OpenTopoMap para intercalar curvas de nivel métricas transparentes sin requerir dependencias C++ / Mapbox core. Requiere conectividad en caché.
-            </Text>
-          </View>
-        </View>
-      </Modal>
-
-      {/* CAMARA MODAL */}
-      <Modal 
-        visible={showWaypointModal} 
-        animationType="slide" 
-        presentationStyle="pageSheet"
-        onRequestClose={() => { setSampleBase64(null); setAiResult(null); setShowWaypointModal(false); }}
-      >
-        <View style={[styles.modalOverlay, {backgroundColor: 'rgba(0,0,0,0.85)'}]}>
-          <ScrollView style={[styles.modalContent, { maxHeight: '100%', flex: 1, backgroundColor: '#000', borderColor: '#FFD700', borderWidth: 2, padding: 20, borderRadius: 20 }, isFieldMode && styles.modalContentLight]}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
-              <Text style={[styles.modalTitle, isFieldMode && styles.modalTitleLight, {fontSize: 18, marginBottom: 0}]}>📸 CAPTURA DE MUESTRA</Text>
-              <TouchableOpacity onPress={() => { setSampleBase64(null); setAiResult(null); setShowWaypointModal(false); }}>
-                <MaterialCommunityIcons name="close" size={28} color={isFieldMode ? "#000" : "#FFD700"} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={[styles.modalSub, {fontSize: 12, color: '#FFF'}]}>Proyecto: {activeProject} | GPS: {mapCenter?.latitude.toFixed(5)}</Text>
-            
-            {!sampleBase64 ? (
-              <View style={{marginTop: 20}}>
-                <Text style={{color: isFieldMode ? '#444' : '#888', fontSize: 14, marginBottom: 15}}>Selecciona el tipo de lente para abrir la cámara:</Text>
-                
-                <TouchableOpacity style={[styles.giantHitboxBtn, isFieldMode ? { backgroundColor: '#FFFFFF', borderColor: '#000000', borderWidth: 3 } : null, { height: 60, marginBottom: 15, backgroundColor: '#222', borderRadius: 8, width: '100%', borderColor: '#444' }]} onPress={() => takeSamplePhoto('normal')}>
-                  <MaterialCommunityIcons name="camera" size={24} color={isFieldMode ? '#000' : '#FFF'} />
-                  <Text style={[styles.giantHitboxText, isFieldMode ? { color: '#000000' } : null, {fontSize: 14, color: '#FFF'}]}> FOTO NORMAL</Text>
-                </TouchableOpacity>
-
-                <View style={{backgroundColor: '#111', padding: 10, borderRadius: 8, marginBottom: 15}}>
-                   <Text style={{color: '#FFD700', fontSize: 12, marginBottom: 10}}>* Monta el lente macro Carson sobre la cámara antes de disparar.</Text>
-                   <TouchableOpacity style={[styles.giantHitboxBtn, isFieldMode ? { backgroundColor: '#FFFFFF', borderColor: '#000000', borderWidth: 3 } : null, { height: 60, backgroundColor: '#222', borderRadius: 8, width: '100%', borderColor: '#444' }]} onPress={() => takeSamplePhoto('microscopio')}>
-                     <MaterialCommunityIcons name="microscope" size={24} color={isFieldMode ? '#000' : '#FFF'} />
-                     <Text style={[styles.giantHitboxText, isFieldMode ? { color: '#000000' } : null, {fontSize: 14, color: '#FFF'}]}> MICROSCOPIO</Text>
-                   </TouchableOpacity>
-                </View>
-
-                <View style={{backgroundColor: '#111', padding: 10, borderRadius: 8, marginBottom: 15}}>
-                   <Text style={{color: '#00FFFF', fontSize: 12, marginBottom: 10}}>* Apaga la luz blanca. Ilumina con linterna UV a 10cm de la roca.</Text>
-                   <TouchableOpacity style={[styles.giantHitboxBtn, isFieldMode ? { backgroundColor: '#FFFFFF', borderColor: '#000000', borderWidth: 3 } : null, { height: 60, backgroundColor: '#222', borderRadius: 8, width: '100%', borderColor: '#444', marginBottom: 10 }]} onPress={() => takeSamplePhoto('uv_365')}>
-                     <MaterialCommunityIcons name="flashlight" size={24} color={isFieldMode ? '#000' : '#FFF'} />
-                     <Text style={[styles.giantHitboxText, isFieldMode ? { color: '#000000' } : null, {fontSize: 14, color: '#FFF'}]}> UV 365nm (Onda Larga)</Text>
-                   </TouchableOpacity>
-                   <TouchableOpacity style={[styles.giantHitboxBtn, isFieldMode ? { backgroundColor: '#FFFFFF', borderColor: '#000000', borderWidth: 3 } : null, { height: 60, backgroundColor: '#222', borderRadius: 8, width: '100%', borderColor: '#444' }]} onPress={() => takeSamplePhoto('uv_254')}>
-                     <MaterialCommunityIcons name="flashlight" size={24} color={isFieldMode ? '#000' : '#FFF'} />
-                     <Text style={[styles.giantHitboxText, isFieldMode ? { color: '#000000' } : null, {fontSize: 14, color: '#FFF'}]}> UV 254nm (Onda Corta)</Text>
-                   </TouchableOpacity>
-                </View>
-
-                <TouchableOpacity style={[styles.modalBtnCancel, {marginTop: 20, backgroundColor: '#FF3B30'}]} onPress={() => setShowWaypointModal(false)}>
-                  <Text style={[styles.modalBtnTextWhite, {fontSize: 14}]}>CANCELAR</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={{marginTop: 10}}>
-                <View style={{ height: 260, backgroundColor: '#000', borderRadius: 8, marginBottom: 15, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' }}>
-                   <Image source={{uri: `data:image/jpeg;base64,${sampleBase64}`}} style={{width: '100%', height: '100%'}} resizeMode="contain" />
-                </View>
-
-                {!aiResult && (
-                   <TouchableOpacity style={[styles.giantHitboxBtn, isFieldMode ? { backgroundColor: '#FFFFFF', borderColor: '#000000', borderWidth: 3 } : null, { height: 60, marginBottom: 15, backgroundColor: '#FFD700', borderRadius: 8, width: '100%' }]} onPress={() => runAI(sampleBase64, sampleCaptureType)} disabled={isAiProcessing}>
-                     {isAiProcessing ? (
-                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                         <ActivityIndicator color={isFieldMode ? "#000" : "#000"} style={{ marginRight: 8 }} />
-                         <Text style={[styles.giantHitboxText, isFieldMode ? { color: '#000000' } : null, {fontSize: 14, marginLeft: 0}]}>ANALIZANDO CON IA...</Text>
-                       </View>
-                     ) : (
-                       <Text style={[styles.giantHitboxText, isFieldMode ? { color: '#000000' } : null, {fontSize: 14, color: '#FFF'}]}>⚠️ ANALIZAR CON IA</Text>
-                     )}
-                   </TouchableOpacity>
-                )}
-
-                {aiResult && (
-                   <View style={[{ backgroundColor: '#222', padding: 15, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#FFD700' }, isFieldMode ? { backgroundColor: '#FFFFFF', borderColor: '#000000', borderWidth: 3 } : null]}>
-                     <Text style={[{color: '#FFD700', fontWeight: 'bold', fontSize: 16}, isFieldMode ? {color: '#000'} : null]}>{aiResult.mineral_detectado.toUpperCase()} ({aiResult.probabilidad}%)</Text>
-                     
-                     <Text style={{color: '#AAA', fontSize: 11, marginTop: 10, letterSpacing: 1}}>ALTERACIÓN / PARAGÉNESIS</Text>
-                     <Text style={[{color: '#FFF', fontSize: 13, marginTop: 2}, isFieldMode ? {color: '#000'} : null]}>{aiResult.alteracion}</Text>
-                     
-                     <Text style={{color: '#AAA', fontSize: 11, marginTop: 10, letterSpacing: 1}}>INDICADORES CLAVE</Text>
-                     <Text style={[{color: '#FFF', fontSize: 13, marginTop: 2}, isFieldMode ? {color: '#000'} : null]}>{aiResult.indicadores?.join(', ')}</Text>
-
-                     {(aiResult.fluorescencia_uv && aiResult.fluorescencia_uv !== 'N/A') && (
-                       <View>
-                         <Text style={{color: '#00FFFF', fontSize: 11, marginTop: 10, letterSpacing: 1}}>FLUORESCENCIA UV</Text>
-                         <Text style={[{color: '#FFF', fontSize: 13, marginTop: 2}, isFieldMode ? {color: '#000'} : null]}>{aiResult.fluorescencia_uv}</Text>
-                       </View>
-                     )}
-
-                     <Text style={{color: '#AAA', fontSize: 11, marginTop: 10, letterSpacing: 1}}>ANÁLISIS TÁCTICO</Text>
-                     <Text style={[{color: '#DDD', fontSize: 13, lineHeight: 18, marginTop: 2}, isFieldMode ? {color: '#000'} : null]}>{aiResult.analisis_detallado}</Text>
-                     
-                     <Text style={[{color: '#FFD700', backgroundColor: '#111', padding: 12, borderRadius: 6, fontSize: 14, fontWeight: 'bold', marginTop: 15}, isFieldMode ? {color: '#000', backgroundColor: '#EEE'} : null]}>{'>>> '} {aiResult.recomendacion}</Text>
-                   </View>
-                )}
-
-                <TextInput 
-                  style={[styles.modalInput, isFieldMode ? styles.modalInputLight : null, { height: 60, fontSize: 14, marginBottom: 15 }]} 
-                  placeholder="Notas geológicas manuales (opcional)..." 
-                  placeholderTextColor="#888"
-                  value={waypointNote} 
-                  onChangeText={setWaypointNote} 
-                  multiline 
-                />
-                
-                <View style={{flexDirection: 'row', justifyContent: 'center', marginTop: 20, gap: 12}}>
-                  <TouchableOpacity style={{flex: 1, minWidth: 100, backgroundColor: 'transparent', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, borderWidth: 2, borderColor: '#FF3B30', alignItems: 'center'}} onPress={() => { setSampleBase64(null); setAiResult(null); setShowWaypointModal(false); }}>
-                    <Text style={{color: '#FF3B30', fontSize: 14, fontWeight: 'bold'}}>CANCELAR</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={{flex: 1, minWidth: 100, backgroundColor: 'transparent', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, borderWidth: 2, borderColor: '#FFD700', alignItems: 'center'}} onPress={() => { setSampleBase64(null); setAiResult(null); }}>
-                    <Text style={{color: '#FFD700', fontSize: 14, fontWeight: 'bold'}}>REINTENTAR</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[{flex: 1, minWidth: 100, backgroundColor: '#FFD700', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, borderWidth: 2, borderColor: '#000', alignItems: 'center'}, isFieldMode ? { backgroundColor: '#FFFFFF', borderColor: '#000000', borderWidth: 3 } : null]} onPress={saveWaypoint}>
-                    <Text style={[{color: '#000', fontSize: 14, fontWeight: 'bold'}, isFieldMode ? { color: '#000000' } : null]}>GUARDAR</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-          </ScrollView>
-        </View>
-      </Modal>
-
-      {/* CHAT EXPERTO MODAL */}
+      {/* CHAT AGRONOMICO MODAL */}
       <Modal visible={showChatModal} transparent animationType="slide">
         <View style={[styles.modalOverlay, {backgroundColor: 'rgba(0,0,0,0.85)'}]}>
-          <View style={[{backgroundColor: '#000', borderColor: '#00FF00', borderWidth: 2, borderRadius: 20, padding: 20, width: '95%', height: '80%'}, isFieldMode && styles.modalContentLight]}>
+          <View style={{backgroundColor: '#000', borderColor: '#4CAF50', borderWidth: 2, borderRadius: 20, padding: 20, width: '95%', height: '80%'}}>
             <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, borderBottomWidth: 1, borderBottomColor: '#333', paddingBottom: 10 }}>
-               <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#00FF00' }}>👨🏻‍💻 DEV IA (Admin)</Text>
+               <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#4CAF50' }}>Asistente Agronomico IA</Text>
                <TouchableOpacity onPress={() => setShowChatModal(false)}>
-                 <MaterialCommunityIcons name="close" size={28} color={isFieldMode ? "#000" : "#FFD700"} />
+                 <MaterialCommunityIcons name="close" size={28} color="#4CAF50" />
                </TouchableOpacity>
             </View>
             <ScrollView style={{flex: 1, marginBottom: 15}}>
               {chatMessages.length === 0 && (
-                <Text style={{color: '#888', textAlign: 'center', marginTop: 20}}>¡Hola! Soy tu asistente de campo. Hazme preguntas técnicas de mineralogía, estratigrafía o uso de equipo.</Text>
+                <Text style={{color: '#888', textAlign: 'center', marginTop: 20}}>Soy tu asistente agronomo. Preguntame sobre cultivos, indices vegetativos, plagas, riego o fenologia.</Text>
               )}
               {chatMessages.map((msg, idx) => (
-                <View key={idx} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', backgroundColor: msg.role === 'user' ? '#333' : '#FFD700', padding: 12, borderRadius: 12, maxWidth: '80%', marginBottom: 10 }}>
+                <View key={idx} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', backgroundColor: msg.role === 'user' ? '#333' : '#4CAF50', padding: 12, borderRadius: 12, maxWidth: '80%', marginBottom: 10 }}>
                   <Text style={{ color: msg.role === 'user' ? '#FFF' : '#000', fontSize: 14 }}>{msg.content}</Text>
                 </View>
               ))}
-              {isTypingChat && <ActivityIndicator color="#FFD700" style={{alignSelf: 'flex-start', marginTop: 10}} />}
+              {isTypingChat && <ActivityIndicator color="#4CAF50" style={{alignSelf: 'flex-start', marginTop: 10}} />}
             </ScrollView>
             <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
-              <TextInput 
-                style={[
-                  {flex: 1, padding: 12, borderRadius: 8, borderWidth: 1},
-                  isFieldMode ? { backgroundColor: '#F5F5F5', color: '#000', borderColor: '#CCC' } : { backgroundColor: '#222', color: '#FFF', borderColor: '#444' }
-                ]} 
-                placeholder="Escribe tu consulta al motor IA..." 
-                placeholderTextColor={isFieldMode ? "#888" : "#666"} 
-                value={chatInput} 
-                onChangeText={setChatInput} 
+              <TextInput
+                style={{ flex: 1, padding: 12, borderRadius: 8, borderWidth: 1, backgroundColor: '#222', color: '#FFF', borderColor: '#444' }}
+                placeholder="Escribe tu consulta agronomica..."
+                placeholderTextColor="#666"
+                value={chatInput}
+                onChangeText={setChatInput}
               />
-              <TouchableOpacity onPress={sendChatMessage} style={{backgroundColor: '#FFD700', padding: 12, borderRadius: 8}}>
-                 <MaterialCommunityIcons name="send" size={24} color="#000" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* HISTORY MODAL */}
-      <Modal visible={showHistoryModal} transparent animationType="slide">
-        <View style={[styles.modalOverlay, {backgroundColor: 'rgba(0,0,0,0.85)'}]}>
-          <View style={[{backgroundColor: '#000', borderColor: '#FFD700', borderWidth: 2, borderRadius: 20, padding: 20, width: '92%', maxHeight: '85%', flex: 1}, isFieldMode && styles.modalContentLight]}>
-            <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, borderBottomWidth: 1, borderBottomColor: '#333', paddingBottom: 10 }}>
-               <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#FFD700' }}>📋 HISTORIAL</Text>
-               <TouchableOpacity onPress={() => setShowHistoryModal(false)}>
-                 <MaterialCommunityIcons name="close" size={28} color={isFieldMode ? "#000" : "#FFD700"} />
-               </TouchableOpacity>
-            </View>
-            <Text style={{ fontSize: 12, color: '#FFF', marginBottom: 10 }}>{waypoints.length} Muestras almacenadas localmente.</Text>
-            
-            <ScrollView style={{flex: 1, marginBottom: 20}}>
-              {waypoints.map((wp, i) => (
-                 <View key={i} style={{paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#333', marginBottom: 8}}>
-                    <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
-                      <Text style={{color: '#888', fontSize: 11}}>{new Date(wp.fecha_hora || wp.timestamp).toLocaleString()}</Text>
-                      <Text style={{color: '#000', fontSize: 10, fontWeight: 'bold', backgroundColor: '#00FFFF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4}}>{wp.proyecto_id || wp.project || 'Sin Proyecto'}</Text>
-                    </View>
-                    <Text style={{color: '#FFF', fontSize: 11, marginTop: 5}}>Lat: {parseFloat(wp.lat || wp.latitude || 0).toFixed(6)} | Lng: {parseFloat(wp.lng || wp.longitude || 0).toFixed(6)}</Text>
-                    <Text style={{color: '#FFD700', fontSize: 12, fontWeight: 'bold', marginTop: 4}}>{wp.mineral_detectado ? `💎 ${wp.mineral_detectado.toUpperCase()} (${wp.score_ia}%)` : (wp.descripcion_texto || wp.note || 'Muestra sin IA')}</Text>
-                 </View>
-              ))}
-              {waypoints.length === 0 && <Text style={{color: '#888', textAlign: 'center', marginTop: 50, fontSize: 12}}>Aún no capturas ninguna muestra</Text>}
-            </ScrollView>
-
-            <View style={{flexDirection: 'row', justifyContent: 'space-between', gap: 10}}>
-              <TouchableOpacity style={{ flex: 1, backgroundColor: 'transparent', borderColor: '#FF3B30', borderWidth: 2, minWidth: 120, padding: 12, borderRadius: 8, justifyContent: 'center', alignItems: 'center' }} onPress={async () => { await clearMuestras(); loadMuestras(); }}>
-                 <Text style={{color: '#FF3B30', fontWeight: 'bold', fontSize: 14}}>Borrar BD</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={{ flex: 1, backgroundColor: '#000', borderColor: '#FFD700', borderWidth: 2, minWidth: 120, padding: 12, borderRadius: 8, justifyContent: 'center', alignItems: 'center' }} onPress={exportCSV}>
-                  <Text style={{color: '#FFD700', fontWeight: 'bold', fontSize: 14}}>Exportar CSV</Text>
+              <TouchableOpacity onPress={sendChatMessage} style={{backgroundColor: '#4CAF50', padding: 12, borderRadius: 8}}>
+                 <MaterialCommunityIcons name="send" size={24} color="#FFF" />
               </TouchableOpacity>
             </View>
           </View>
@@ -1651,116 +1052,43 @@ _Datos: ESA Copernicus, NASA, USGS_`;
       {/* CONFIGURATION MODAL */}
       <Modal visible={showConfigModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <ScrollView style={[styles.modalContent, { maxHeight: '85%' }, isFieldMode && styles.modalContentLight]}>
+          <View style={[styles.modalContent, { borderColor: '#2d7a2d' }]}>
             <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
-               <Text style={[styles.modalTitle, isFieldMode && styles.modalTitleLight, { marginBottom: 0 }]}>⚙️ CONFIGURACIÓN</Text>
+               <Text style={[styles.modalTitle, { color: '#2d7a2d' }]}>Configuracion</Text>
                <TouchableOpacity onPress={() => setShowConfigModal(false)}>
-                  <MaterialCommunityIcons name="close" size={28} color={isFieldMode ? "#000" : "#FFD700"} />
+                  <MaterialCommunityIcons name="close" size={28} color="#2d7a2d" />
                </TouchableOpacity>
             </View>
 
-            <Text style={[styles.sectionHeader, { color: '#00FFFF', marginTop: 20, fontWeight: 'bold' }]}>0. GESTIÓN LOCAL</Text>
-            <Text style={[styles.sectionLabelModal, isFieldMode && { color: '#444' }]}>PROYECTO ACTIVO</Text>
-            <TextInput 
-              style={[styles.modalInput, isFieldMode && styles.modalInputLight, { height: 44, marginBottom: 10, fontSize: 15, fontWeight: 'bold' }]} 
-              value={activeProject} 
-              onChangeText={setActiveProject} 
-              placeholder="Ej: Concesión Norte" 
+            <Text style={[styles.sectionLabelModal, { color: '#4CAF50' }]}>NOMBRE DE FINCA / PROYECTO</Text>
+            <TextInput
+              style={[styles.modalInput, { height: 44, marginBottom: 10, fontSize: 15, fontWeight: 'bold' }]}
+              value={activeProject}
+              onChangeText={setActiveProject}
+              placeholder="Ej: Mi Finca Norte"
               placeholderTextColor="#888"
             />
 
-            <Text style={[styles.sectionHeader, { color: '#00FFFF', marginTop: 20, fontWeight: 'bold' }]}>1. GEOLOGÍA ESTRUCTURAL</Text>
-
-            <Text style={[styles.sectionLabelModal, isFieldMode && { color: '#444' }]}>MINERAL OBJETIVO</Text>
-            <View style={styles.chipsRowModal}>
-              {['oro','plata','cobre','zinc','plomo'].map(m => (
-                <TouchableOpacity key={m} style={[styles.chipModal, selectedMineral === m && styles.chipActive]} onPress={() => setSelectedMineral(m)}>
-                  <Text style={[styles.chipTextModal, selectedMineral === m && styles.chipTextActive]}>{m}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={[styles.sectionLabelModal, isFieldMode && { color: '#444' }]}>TIPO DE TERRENO</Text>
-            <View style={styles.chipsRowModal}>
-              {['sierra','playa'].map(m => (
-                <TouchableOpacity key={m} style={[styles.chipModal, terrainType === m && styles.chipActive]} onPress={() => setTerrainType(m)}>
-                  <Text style={[styles.chipTextModal, terrainType === m && styles.chipTextActive]}>{m}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={[styles.sectionLabelModal, isFieldMode && { color: '#444' }]}>PROFUNDIDAD EST.</Text>
-            <View style={styles.chipsRowModal}>
-              {['0-5m','5-20m','20m+'].map(m => (
-                <TouchableOpacity key={m} style={[styles.chipModal, depth === m && styles.chipActive]} onPress={() => setDepth(m)}>
-                  <Text style={[styles.chipTextModal, depth === m && styles.chipTextActive]}>{m}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={[styles.sectionLabelModal, isFieldMode && { color: '#444' }]}>TIPO DE ROCA MASIVA</Text>
-            <View style={styles.chipsRowModal}>
-              {['ignea','sedimentaria','metamorfica'].map(m => (
-                <TouchableOpacity key={m} style={[styles.chipModal, rockType === m && styles.chipActive]} onPress={() => setRockType(m)}>
-                  <Text style={[styles.chipTextModal, rockType === m && styles.chipTextActive]}>{m === 'metamorfica' ? 'metamórfica' : m}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={[styles.sectionHeader, { color: '#00FFFF', marginTop: 30, fontWeight: 'bold' }]}>2. ANÁLISIS ÓPTICO / IA</Text>
             <View style={styles.prefsRow}>
-              <Text style={[styles.sectionLabelModal, isFieldMode && { color: '#444' }, { marginBottom: 0, marginTop: 0 }]}>Claude Vision On/Off</Text>
-              <Switch value={useAI} onValueChange={setUseAI} trackColor={{ true: '#FFD700' }} />
+              <Text style={[styles.sectionLabelModal, { color: '#4CAF50', marginBottom: 0, marginTop: 0 }]}>Claude Vision (IA)</Text>
+              <Switch value={useAI} onValueChange={setUseAI} trackColor={{ true: '#4CAF50' }} />
             </View>
-            {useAI && <Text style={{color: '#888', fontSize: 11}}>Modelo Activo: claude-haiku-4-5-20251001</Text>}
-            <View style={styles.prefsRow}>
-              <Text style={[styles.sectionLabelModal, isFieldMode && { color: '#444' }, { marginBottom: 0, marginTop: 0 }]}>Auto-Análisis AI en Muestreo</Text>
-              <Switch value={autoAnalyzeSample} onValueChange={setAutoAnalyzeSample} trackColor={{ true: '#FFD700' }} />
-            </View>
+            {useAI && <Text style={{color: '#888', fontSize: 11}}>Modelo: claude-haiku-4-5-20251001</Text>}
 
-            <Text style={[styles.sectionHeader, { color: '#00FFFF', marginTop: 30, fontWeight: 'bold' }]}>3. HARDWARE EXTERNO</Text>
-            <Text style={[styles.sectionLabelModal, isFieldMode && { color: '#444' }]}>LÁMPARA UV / FLUORESCENCIA</Text>
-            <View style={styles.chipsRowModal}>
-              {['Ninguna','365nm','254nm'].map(m => (
-                <TouchableOpacity key={m} style={[styles.chipModal, uvLamp === m && styles.chipActive]} onPress={() => setUvLamp(m)}>
-                  <Text style={[styles.chipTextModal, uvLamp === m && styles.chipTextActive]}>{m}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
             <View style={styles.prefsRow}>
-              <Text style={[styles.sectionLabelModal, isFieldMode && { color: '#444' }, { marginBottom: 0, marginTop: 0 }]}>Microscopio USB-C Carson</Text>
-              <TouchableOpacity style={{padding: 6, backgroundColor: microscopeConnected ? '#00FF00' : '#333', borderRadius: 8}} onPress={() => setMicroscopeConnected(!microscopeConnected)}>
-                 <Text style={{color: microscopeConnected ? '#000' : '#FFF', fontWeight: 'bold'}}>{microscopeConnected ? 'CONECTADO' : 'INACTIVO'}</Text>
-              </TouchableOpacity>
-            </View>
-
-            <Text style={[styles.sectionHeader, { color: '#00FFFF', marginTop: 30, fontWeight: 'bold' }]}>4. BASE DE DATOS Y NUBE</Text>
-            <View style={styles.prefsRow}>
-               <Text style={[styles.sectionLabelModal, isFieldMode && { color: '#444' }, { marginBottom: 0, marginTop: 0 }]}>Sincronización Cloud Automática</Text>
-               <Switch value={autoSync} onValueChange={setAutoSync} trackColor={{ true: '#FFD700' }} />
-            </View>
-            <Text style={[styles.sectionLabelModal, isFieldMode && { color: '#444' }]}>URL SERVICIO BACKEND</Text>
-            <TextInput style={[styles.modalInput, {height: 50, marginBottom: 10, fontSize: 14}]} value={serverUrl} onChangeText={setServerUrl} placeholder="Ej: https://..." />
-
-            <Text style={[styles.sectionHeader, { color: '#00FFFF', marginTop: 30, fontWeight: 'bold' }]}>5.SISTEMA / INTERFAZ</Text>
-            <View style={styles.prefsRow}>
-              <Text style={[styles.sectionLabelModal, isFieldMode && { color: '#444' }, { marginBottom: 0, marginTop: 0 }]}>Modo Solar Alto Contraste</Text>
-              <Switch value={isFieldMode} onValueChange={setIsFieldMode} trackColor={{ true: '#FFD700' }} />
-            </View>
-            <View style={styles.prefsRow}>
-              <Text style={[styles.sectionLabelModal, isFieldMode && { color: '#444' }, { marginBottom: 0, marginTop: 0 }]}>Motor Háptico (Vibración)</Text>
-              <Switch value={vibrationEnabled} onValueChange={setVibrationEnabled} trackColor={{ true: '#FFD700' }} />
+              <Text style={[styles.sectionLabelModal, { color: '#4CAF50', marginBottom: 0, marginTop: 0 }]}>Vibracion haptica</Text>
+              <Switch value={vibrationEnabled} onValueChange={setVibrationEnabled} trackColor={{ true: '#4CAF50' }} />
             </View>
 
             <View style={[styles.modalActions, { marginTop: 30 }]}>
-              <TouchableOpacity style={styles.modalBtnSave} onPress={() => setShowConfigModal(false)}>
-                <Text style={styles.modalBtnTextBlack}>Guardar Parámetros Globales</Text>
+              <TouchableOpacity style={[styles.modalBtnSave, { backgroundColor: '#2d7a2d' }]} onPress={() => setShowConfigModal(false)}>
+                <Text style={[styles.modalBtnTextBlack, { color: '#FFF' }]}>Guardar</Text>
               </TouchableOpacity>
             </View>
-            <View style={{height: 40}} /> 
-          </ScrollView>
+          </View>
         </View>
       </Modal>
+
       {/* ── AGROCROP CONFIG MODAL (v5.0 con ScrollView) ────────────────── */}
       <Modal visible={showCropModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
@@ -2198,34 +1526,19 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   
   mapContainer: { flex: 0.70, position: 'relative' },
-  consoleContainer: { flex: 0.30, backgroundColor: '#111', borderTopWidth: 2, borderTopColor: '#FFD700' },
-  topToolbar: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', width: '100%', paddingVertical: 8, backgroundColor: '#222', borderBottomWidth: 1, borderBottomColor: '#333' },
-  hudBtnBase: { alignItems: 'center', justifyContent: 'center', padding: 6, minWidth: 70 },
-  hudBtnText: { color: '#FFD700', fontSize: 14, fontWeight: 'bold', marginTop: 4 },
+  consoleContainer: { flex: 0.30, backgroundColor: '#111', borderTopWidth: 2, borderTopColor: '#2d7a2d' },
   consoleContentArea: { flex: 1, padding: 10, justifyContent: 'center', width: '100%' },
   actionBox: { flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center' },
   instructionText: { color: '#FFF', fontSize: 16, fontWeight: 'bold', marginBottom: 10, letterSpacing: 1 },
-  giantHitboxBtn: { backgroundColor: '#FFD700', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 70, width: '90%', borderRadius: 12, borderWidth: 2, borderColor: '#000', elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 4 },
-  giantHitboxText: { color: '#000', fontWeight: '900', fontSize: 20, letterSpacing: 1, marginLeft: 10 },
   cancelDrawBtn: { marginTop: 15, padding: 10, backgroundColor: 'rgba(255, 85, 85, 0.2)', borderRadius: 8, borderWidth: 1, borderColor: '#FF5555' },
   cancelDrawText: { color: '#FF5555', fontSize: 16, fontWeight: 'bold' },
-  selectorsRow: { flexDirection: 'row', width: '100%', justifyContent: 'space-between', paddingHorizontal: 5, marginBottom: 10 },
-  halfSelector: { flex: 1, alignItems: 'center' },
-  sectionLabel: { color: '#AAA', fontSize: 12, fontWeight: 'bold', marginBottom: 8, letterSpacing: 1 },
-  chipsRow: { flexDirection: 'row', gap: 12 },
-  chip: { backgroundColor: '#333', paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8, borderWidth: 1, borderColor: '#555', elevation: 5 },
-  chipActive: { backgroundColor: '#FFD700', borderColor: '#FFD700' },
-  chipText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
-  chipTextActive: { color: '#000' },
-  analyzeHitboxBtn: { backgroundColor: '#FFD700', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 60, width: '90%', borderRadius: 12, borderWidth: 2, borderColor: '#000', marginTop: 15, elevation: 5 },
-  analyzeHitboxText: { color: '#000', fontWeight: '900', fontSize: 18, letterSpacing: 1, marginLeft: 10 },
   
-  loadingText: { marginTop: 15, color: '#FFD700', fontSize: 14, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  loadingText: { marginTop: 15, color: '#2d7a2d', fontSize: 14, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
   errorText: { color: '#FF5555', fontSize: 14, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
   map: { ...StyleSheet.absoluteFillObject },
   
   numberedMarker: {
-    width: 24, height: 24, borderRadius: 12, backgroundColor: '#FFD700',
+    width: 24, height: 24, borderRadius: 12, backgroundColor: '#2d7a2d',
     borderWidth: 2, borderColor: '#000', justifyContent: 'center', alignItems: 'center',
   },
   numberedMarkerText: { color: '#000', fontSize: 12, fontWeight: '900' },
@@ -2234,14 +1547,14 @@ const styles = StyleSheet.create({
 
   zoomControlsContainer: {
     position: 'absolute', right: 10, top: '35%',
-    backgroundColor: 'rgba(255, 215, 0, 0.8)',
+    backgroundColor: 'rgba(45, 122, 45, 0.85)',
     borderRadius: 6, borderWidth: 1, borderColor: '#000', overflow: 'hidden',
   },
   zoomBtn: { padding: 10, justifyContent: 'center', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.3)' },
 
   panel: {
     position: 'absolute', backgroundColor: 'rgba(10, 10, 10, 0.75)',
-    borderColor: '#FFD700', borderWidth: 1, borderRadius: 6,
+    borderColor: '#2d7a2d', borderWidth: 1, borderRadius: 6,
     padding: 8, elevation: 5,
   },
   topPanel: { top: 40, alignSelf: 'center', width: 'auto', alignItems: 'center' },
@@ -2250,280 +1563,40 @@ const styles = StyleSheet.create({
   rightPanel: { bottom: 10, right: 10, alignItems: 'center', width: 70 },
   
   row: { flexDirection: 'row', alignItems: 'center' },
-  titleText: { color: '#FFD700', fontSize: 12, fontWeight: 'bold' },
+  titleText: { color: '#2d7a2d', fontSize: 12, fontWeight: 'bold' },
   dataTextLarge: { color: '#FFF', fontSize: 16, fontWeight: 'bold', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', marginTop: 2 },
-  labelText: { color: '#FFD700', fontSize: 9, letterSpacing: 1 },
+  labelText: { color: '#2d7a2d', fontSize: 9, letterSpacing: 1 },
   
-  statsTextHighlight: { color: '#FFD700', fontSize: 12, fontWeight: 'bold', marginBottom: 2 },
-  statsTextArea: { color: '#FFD700', fontSize: 24, fontWeight: '900', letterSpacing: 1 },
+  statsTextHighlight: { color: '#2d7a2d', fontSize: 12, fontWeight: 'bold', marginBottom: 2 },
+  statsTextArea: { color: '#2d7a2d', fontSize: 24, fontWeight: '900', letterSpacing: 1 },
   statsTextAreaSm: { color: '#AAA', fontSize: 12, marginTop: 1 },
 
-  analysisMarker: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#FFD700',
-    borderWidth: 2,
-    borderColor: '#000',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  analysisMarkerText: {
-    color: '#000',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
+  locationButton: { position: 'absolute', bottom: 100, right: 10, backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 30, padding: 10, borderWidth: 1, borderColor: '#2d7a2d', zIndex: 20 },
+  northIndicator: { position: 'absolute', top: 60, right: 10, width: 50, height: 50, backgroundColor: 'rgba(0,0,0,0.8)', borderRadius: 25, borderWidth: 2, borderColor: '#2d7a2d', justifyContent: 'center', alignItems: 'center', zIndex: 20 },
+  northArrow: { alignItems: 'center', justifyContent: 'center' },
+  northText: { color: '#2d7a2d', fontSize: 10, fontWeight: 'bold', marginTop: -4 },
+
   resultsPanel: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    maxHeight: '58%',
-    backgroundColor: 'rgba(0,0,0,0.97)',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderTopWidth: 2,
-    borderTopColor: '#FFD700',
-    padding: 12,
-    zIndex: 100,
-  },
-  metalCard: {
-    backgroundColor: '#111',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-    padding: 10,
-    marginBottom: 8,
-  },
-  detectedBadge: {
-    borderWidth: 1,
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  scoreBarRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  scoreBarLabel: {
-    color: '#666',
-    fontSize: 9,
-    width: 72,
-    letterSpacing: 0.4,
-  },
-  scoreBarTrack: {
-    flex: 1,
-    height: 6,
-    backgroundColor: '#1A1A1A',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  scoreBarFill: {
-    height: 6,
-    borderRadius: 3,
-  },
-  scoreBarValue: {
-    color: '#AAA',
-    fontSize: 11,
-    fontWeight: 'bold',
-    width: 28,
-    textAlign: 'right',
+    position: 'absolute', bottom: 0, left: 0, right: 0, maxHeight: '58%',
+    backgroundColor: 'rgba(0,0,0,0.97)', borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    borderTopWidth: 2, borderTopColor: '#2d7a2d', padding: 12, zIndex: 100,
   },
   resultsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#FFD700',
-    paddingBottom: 8,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: 10, borderBottomWidth: 1, borderBottomColor: '#2d7a2d', paddingBottom: 8,
   },
-  resultsTitle: {
-    color: '#FFD700',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  resultsList: {
-    maxHeight: 300,
-  },
-  resultItem: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
-    paddingVertical: 10,
-  },
-  resultRank: {
-    color: '#FFD700',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  resultScore: {
-    color: '#FFF',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  resultInterpret: {
-    color: '#AAA',
-    fontSize: 11,
-    marginTop: 2,
-  },
-  northIndicator: { position: 'absolute', top: 60, right: 10, width: 50, height: 50, backgroundColor: 'rgba(0,0,0,0.8)', borderRadius: 25, borderWidth: 2, borderColor: '#FFD700', justifyContent: 'center', alignItems: 'center', zIndex: 20 },
-  northArrow: { alignItems: 'center', justifyContent: 'center' },
-  northText: { color: '#FFD700', fontSize: 10, fontWeight: 'bold', marginTop: -4 },
-  compassContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  compassArrow: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  resultsTitle: { color: '#2d7a2d', fontSize: 16, fontWeight: 'bold' },
 
-  heatmapLegend: { position: 'absolute', bottom: 10, left: 10, backgroundColor: 'rgba(0,0,0,0.85)', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#FFD700', zIndex: 25 },
-  legendTitle: { color: '#FFD700', fontSize: 12, fontWeight: 'bold', marginBottom: 5, textAlign: 'center' },
-  legendItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  legendColor: { width: 20, height: 20, borderRadius: 4, marginRight: 8 },
-  legendText: { color: '#FFF', fontSize: 10 },
-  locationButton: { position: 'absolute', bottom: 100, right: 10, backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 30, padding: 10, borderWidth: 1, borderColor: '#FFD700', zIndex: 20 },
-  
-  waypointMarker: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#00FFFF', borderWidth: 2, borderColor: '#000', justifyContent: 'center', alignItems: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalContent: { width: '100%', backgroundColor: '#111', borderRadius: 12, padding: 20, borderWidth: 2, borderColor: '#FFD700' },
-  modalContentLight: { backgroundColor: '#FFFFFF', borderColor: '#000000', borderWidth: 3 },
-  modalTitle: { color: '#FFD700', fontSize: 24, fontWeight: '900', marginBottom: 5 },
-  modalTitleLight: { color: '#000000' },
-  modalSub: { color: '#AAA', fontSize: 14, marginBottom: 15 },
+  modalContent: { width: '100%', backgroundColor: '#111', borderRadius: 12, padding: 20, borderWidth: 2, borderColor: '#2d7a2d' },
+  modalTitle: { color: '#2d7a2d', fontSize: 24, fontWeight: '900', marginBottom: 5 },
   modalInput: { backgroundColor: '#222', color: '#FFF', borderRadius: 8, padding: 15, height: 120, textAlignVertical: 'top', fontSize: 18 },
-  modalInputLight: { backgroundColor: '#EEE', color: '#000' },
   modalActions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20, gap: 10 },
-  modalBtnCancel: { flex: 1, backgroundColor: '#333', padding: 20, borderRadius: 8, alignItems: 'center' },
-  modalBtnSave: { flex: 1, backgroundColor: '#FFD700', padding: 20, borderRadius: 8, alignItems: 'center' },
-  modalBtnTextWhite: { color: '#FFF', fontWeight: 'bold', fontSize: 18 },
+  modalBtnSave: { flex: 1, backgroundColor: '#2d7a2d', padding: 20, borderRadius: 8, alignItems: 'center' },
   modalBtnTextBlack: { color: '#000', fontWeight: 'bold', fontSize: 18 },
-  
-  resultRecom: { color: '#00FFFF', fontSize: 11, fontWeight: 'bold', marginTop: 2 },
-  sectionLabelModal: { color: '#FFD700', fontSize: 12, fontWeight: 'bold', marginTop: 15, marginBottom: 8, letterSpacing: 1 },
-  sectionHeader: { fontSize: 15, marginTop: 15, marginBottom: 5, letterSpacing: 0.5 },
-  chipsRowModal: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chipModal: { backgroundColor: '#333', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: '#555' },
-  chipTextModal: { color: '#FFF', fontSize: 14, fontWeight: 'bold', textTransform: 'capitalize' },
+
+  sectionLabelModal: { color: '#2d7a2d', fontSize: 12, fontWeight: 'bold', marginTop: 15, marginBottom: 8, letterSpacing: 1 },
   prefsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, marginTop: 10 },
-  separator: { height: 1, backgroundColor: '#444' },
-
-  // ── Tap-point analysis panel ───────────────────────────────────────────────
-  tapPanel: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    maxHeight: '62%',
-    backgroundColor: 'rgba(0,0,0,0.97)',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderTopWidth: 2,
-    borderTopColor: '#00FFFF',
-    padding: 12,
-    zIndex: 101,
-  },
-  indicatorsBox: {
-    backgroundColor: '#0C0C0C',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#252525',
-    padding: 12,
-    marginBottom: 8,
-  },
-  indicatorsTitle: {
-    color: '#AAA',
-    fontWeight: '900',
-    fontSize: 10,
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  indicatorRow: {
-    paddingVertical: 7,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1A1A1A',
-  },
-  indicatorText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-
-  // ── Ranking section ────────────────────────────────────────────────────────
-  rankingSection: {
-    marginTop: 4,
-    borderTopWidth: 1,
-    borderTopColor: '#222',
-    paddingTop: 12,
-  },
-  rankingHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  rankingTitle: {
-    color: '#FFD700',
-    fontWeight: '900',
-    fontSize: 10,
-    letterSpacing: 0.8,
-    flex: 1,
-  },
-  rankingMaxLabel: {
-    color: '#555',
-    fontSize: 10,
-    marginLeft: 8,
-  },
-  rankingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1A1A1A',
-  },
-  rankingRank: {
-    color: '#FFD700',
-    fontWeight: '900',
-    fontSize: 12,
-    width: 24,
-  },
-  rankingCoord: {
-    color: '#555',
-    fontSize: 9,
-    marginBottom: 4,
-    fontFamily: 'monospace',
-  },
-  rankingTrack: {
-    width: '100%',
-    height: 5,
-    backgroundColor: '#111',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  rankingCeiling: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: '#1E1E1E',
-  },
-  rankingFill: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    borderRadius: 3,
-    opacity: 0.85,
-  },
-  rankingScore: {
-    fontWeight: '900',
-    fontSize: 12,
-  },
-  rankingPct: {
-    color: '#555',
-    fontSize: 9,
-    marginTop: 2,
-  },
 });
 
 

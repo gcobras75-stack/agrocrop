@@ -1,5 +1,6 @@
 ﻿// app/core/ClaudeServices.ts
-import { AnalysisPoint } from './GeologicalEngine';
+// GeologicalEngine removed — type kept for legacy function signature
+type AnalysisPoint = { id: string; rank: number; base_score: number; indices: any; lat: number; lng: number };
 
 // ─── MODELOS ───────────────────────────────────────────
 const MODEL_FAST   = 'claude-haiku-4-5-20251001';   // Cámara y chat
