@@ -392,7 +392,7 @@ ${(cropData as any).proyeccion ? `
 ━━━━━━━━━━━━━━━━━
 ${mangoSection}
 
-🤖 _Generado con AgroCrop v2.7_
+🤖 _Generado con AgroCrop v2.8_
 _Datos: ESA Copernicus, NASA, USGS_`;
 
       await Share.share({
@@ -674,8 +674,8 @@ _Datos: ESA Copernicus, NASA, USGS_`;
   // ── Heatmap grid polygon data (memoized) ────────────────────────────────
   const cropGridPolygons = useMemo(() => {
     if (!cropGridCells.length) return [];
-    // Calculate halfDeg from actual cell size in meters
-    const halfDeg = (cropCellSizeM / 1000) / 111.32 / 2;
+    // Calculate halfDeg from actual cell size in meters (with minimum visibility)
+    const halfDeg = Math.max((cropCellSizeM / 1000) / 111.32 / 2, 0.00005);
     console.log('[AgroCrop] Renderizando', cropGridCells.length, 'celdas, celda:', cropCellSizeM, 'm, halfDeg:', halfDeg.toFixed(5));
     return cropGridCells.map((cell, i) => ({
       key: `hm-${i}`,
@@ -728,8 +728,8 @@ _Datos: ESA Copernicus, NASA, USGS_`;
 
   // Live zoom level for label visibility (updated during pan/zoom)
   const [currentZoom, setCurrentZoom] = useState(0.5);
-  const zoomMinLabels = cropCellSizeM < 200 ? 0.05 : cropCellSizeM < 500 ? 0.15 : cropCellSizeM < 1000 ? 0.30 : 0.50;
-  const showGridLabels = currentZoom < zoomMinLabels && visibleGridPolygons.length <= 200;
+  const zoomMinLabels = cropCellSizeM < 30 ? 0.005 : cropCellSizeM < 100 ? 0.02 : cropCellSizeM < 500 ? 0.1 : 0.3;
+  const showGridLabels = currentZoom < zoomMinLabels && visibleGridPolygons.length <= 300;
 
   const triggerHaptic = (type: 'light' | 'medium' | 'heavy' | 'success') => {
     if (!vibrationEnabled) return;
@@ -1058,7 +1058,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
 
         {/* VERSION TAG */}
         <View style={styles.versionTag}>
-          <Text style={styles.versionTagText}>AgroCrop v2.7</Text>
+          <Text style={styles.versionTagText}>AgroCrop v2.8</Text>
         </View>
 
         {/* FLOATING MAP CONTROLS (RIGHT) */}
@@ -1756,10 +1756,15 @@ _Datos: ESA Copernicus, NASA, USGS_`;
                 {/* Grid precision info */}
                 {cropGridCells.length > 0 && (
                   <View style={{ backgroundColor: '#F5F5F5', borderRadius: 10, padding: 10, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={{ fontSize: 16 }}>🗺️</Text>
-                    <Text style={{ color: '#666', fontSize: 12 }}>
-                      Precision: 1 celda = {Math.round(cropCellSizeM * cropCellSizeM / 10000 * 10) / 10} ha ({cropCellSizeM}m x {cropCellSizeM}m) - {cropGridCells.length} celdas
-                    </Text>
+                    <Text style={{ fontSize: 16 }}>{cropCellSizeM <= 30 ? '🎯' : '🗺️'}</Text>
+                    <View>
+                      <Text style={{ color: '#333', fontSize: 12, fontWeight: '600' }}>
+                        {cropCellSizeM}m x {cropCellSizeM}m — {cropCellSizeM <= 30 ? 'Alta precision' : cropCellSizeM <= 100 ? 'Precision media' : 'Vista regional'}
+                      </Text>
+                      <Text style={{ color: '#888', fontSize: 11 }}>
+                        {cropGridCells.length} zonas analizadas
+                      </Text>
+                    </View>
                   </View>
                 )}
 
