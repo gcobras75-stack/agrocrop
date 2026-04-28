@@ -392,7 +392,7 @@ ${(cropData as any).proyeccion ? `
 ━━━━━━━━━━━━━━━━━
 ${mangoSection}
 
-🤖 _Generado con AgroCrop v2.6_
+🤖 _Generado con AgroCrop v2.7_
 _Datos: ESA Copernicus, NASA, USGS_`;
 
       await Share.share({
@@ -488,26 +488,56 @@ _Datos: ESA Copernicus, NASA, USGS_`;
 
   // ── Persistent parcel storage ────────────────────────────────────────────
   const guardarParcela = async (nombre: string, coords: Coordinate[], tipoCultivo: string) => {
-    const parcelas = await AsyncStorage.getItem('mis_parcelas');
-    const lista = parcelas ? JSON.parse(parcelas) : [];
-    const nueva = {
-      id: Date.now().toString(),
-      nombre,
-      coordenadas: coords,
-      tipo_cultivo: tipoCultivo,
-      hectareas: Math.round(calcPolygonArea(coords) / 10000),
-      fecha_creacion: new Date().toISOString(),
-      ultimo_analisis: null,
-    };
-    lista.push(nueva);
-    await AsyncStorage.setItem('mis_parcelas', JSON.stringify(lista));
-    setSavedParcelas(lista);
-    return nueva;
+    if (!coords || coords.length < 3) {
+      console.error('[GUARDAR] Error: coords vacias o < 3:', coords?.length);
+      Alert.alert('Error', 'No hay poligono valido para guardar.');
+      return null;
+    }
+    if (!tipoCultivo) {
+      Alert.alert('Error', 'Selecciona el tipo de cultivo.');
+      return null;
+    }
+    try {
+      console.log('[GUARDAR] Guardando:', nombre, '| coords:', coords.length, '| cultivo:', tipoCultivo);
+      const parcelas = await AsyncStorage.getItem('mis_parcelas');
+      const lista = parcelas ? JSON.parse(parcelas) : [];
+      const nueva = {
+        id: Date.now().toString(),
+        nombre: nombre?.trim() || 'Mi Parcela',
+        coordenadas: coords,
+        tipo_cultivo: tipoCultivo,
+        hectareas: Math.round(calcPolygonArea(coords) / 10000),
+        fecha_creacion: new Date().toISOString(),
+        ultimo_analisis: null,
+        resultado_analisis: null,
+      };
+      lista.push(nueva);
+      await AsyncStorage.setItem('mis_parcelas', JSON.stringify(lista));
+      setSavedParcelas([...lista]);
+      console.log('[GUARDAR] OK. Total parcelas:', lista.length);
+      return nueva;
+    } catch (e: any) {
+      console.error('[GUARDAR] Error:', e.message);
+      Alert.alert('Error al guardar', 'No se pudo guardar. Intenta de nuevo.');
+      return null;
+    }
   };
 
   const cargarParcelas = async () => {
-    const data = await AsyncStorage.getItem('mis_parcelas');
-    if (data) setSavedParcelas(JSON.parse(data));
+    try {
+      const data = await AsyncStorage.getItem('mis_parcelas');
+      if (data) {
+        const lista = JSON.parse(data);
+        setSavedParcelas(lista);
+        console.log('[PARCELAS] Cargadas:', lista.length);
+      } else {
+        setSavedParcelas([]);
+        console.log('[PARCELAS] Sin parcelas guardadas');
+      }
+    } catch (e: any) {
+      console.error('[PARCELAS] Error cargando:', e.message);
+      setSavedParcelas([]);
+    }
   };
 
   const borrarParcela = async (id: string) => {
@@ -1028,7 +1058,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
 
         {/* VERSION TAG */}
         <View style={styles.versionTag}>
-          <Text style={styles.versionTagText}>AgroCrop v2.6</Text>
+          <Text style={styles.versionTagText}>AgroCrop v2.7</Text>
         </View>
 
         {/* FLOATING MAP CONTROLS (RIGHT) */}
@@ -1103,14 +1133,29 @@ _Datos: ESA Copernicus, NASA, USGS_`;
       {/* ═══ BOTTOM BAR (80px) ═══ */}
       <View style={styles.bottomBar}>
         <TouchableOpacity
-          style={styles.bottomBtnPrimary}
-          onPress={() => setShowCropModal(true)}
+          style={[styles.bottomBtnPrimary, polygonCoords.length >= 3 && { backgroundColor: '#00C853' }]}
+          onPress={() => {
+            if (polygonCoords.length >= 3) {
+              if (!cropTipoCultivo || cropTipoCultivo === 'maiz_riego') {
+                Alert.alert('Tipo de cultivo', 'Selecciona el cultivo para analizar', [
+                  { text: 'Maiz Riego', onPress: () => startCropAnalysis(polygonCoords, 'maiz_riego') },
+                  { text: 'Maiz Temporal', onPress: () => startCropAnalysis(polygonCoords, 'maiz_temporal') },
+                  { text: 'Mango Ataulfo', onPress: () => startCropAnalysis(polygonCoords, 'mango_ataulfo') },
+                  { text: 'Mas opciones', onPress: () => setShowCropModal(true) },
+                ]);
+              } else {
+                startCropAnalysis(polygonCoords, cropTipoCultivo);
+              }
+            } else {
+              setShowCropModal(true);
+            }
+          }}
         >
-          <Text style={styles.bottomBtnPrimaryText}>🌾 ANALIZAR mis cultivos</Text>
+          <Text style={styles.bottomBtnPrimaryText}>{polygonCoords.length >= 3 ? '🚀 INICIAR ANALISIS' : '🌾 ANALIZAR mis cultivos'}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.bottomBtnSecondary}
-          onPress={() => setShowParcelasModal(true)}
+          onPress={() => { cargarParcelas(); setShowParcelasModal(true); }}
         >
           <Text style={styles.bottomBtnSecondaryText}>📂 MIS PARCELAS</Text>
         </TouchableOpacity>
@@ -1312,12 +1357,15 @@ _Datos: ESA Copernicus, NASA, USGS_`;
                 }}
                 disabled={newParcelName.length < 3 || !newParcelCultivo}
                 onPress={async () => {
-                  await guardarParcela(newParcelName, polygonCoords, newParcelCultivo);
-                  setShowSavePolygonModal(false);
-                  setNewParcelName('');
-                  setNewParcelCultivo('');
-                  triggerHaptic('success');
-                  Alert.alert('Parcela guardada', 'Tu parcela ha sido guardada exitosamente.');
+                  const savedCoords = [...polygonCoords];
+                  const result = await guardarParcela(newParcelName, savedCoords, newParcelCultivo);
+                  if (result) {
+                    setShowSavePolygonModal(false);
+                    setNewParcelName('');
+                    setNewParcelCultivo('');
+                    triggerHaptic('success');
+                    Alert.alert('Parcela guardada', `"${result.nombre}" guardada con ${savedCoords.length} vertices.`);
+                  }
                 }}
               >
                 <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 15 }}>GUARDAR PARCELA</Text>
