@@ -163,7 +163,7 @@ export default function AgroCropDashboard() {
   };
 
   // ── AgroCrop analysis flow ─────────────────────────────────────────────
-  const startCropAnalysis = async () => {
+  const startCropAnalysis = async (coordsOverride?: Coordinate[], tipoOverride?: string) => {
     setCropError('');
     setCropAnalyzing(true);
     setCropClaudeAnalysis('');
@@ -174,19 +174,24 @@ export default function AgroCropDashboard() {
     setShowCropResults(true);
     triggerHaptic('medium');
 
+    // Use overrides if provided (from saved parcels), otherwise use current state
+    const coordsToUse = coordsOverride || polygonCoords;
+    const tipoToUse = tipoOverride || cropTipoCultivo;
+    if (tipoOverride) setCropTipoCultivo(tipoOverride);
+    if (coordsOverride) setPolygonCoords(coordsOverride);
+
     try {
       // Build coordinates based on area mode
       let geeCoords: number[][];
-      console.log('[AgroCrop] Modo area:', cropAreaMode, '| polygonCoords:', polygonCoords.length);
+      console.log('[AgroCrop] Modo area:', cropAreaMode, '| coords:', coordsToUse.length, '| tipo:', tipoToUse);
 
-      if (cropAreaMode !== 'circle' && polygonCoords.length >= 3) {
-        // Manual trace or coordinates — use existing polygonCoords
-        geeCoords = polygonCoords.map(c => [c.longitude, c.latitude]);
+      if (coordsToUse.length >= 3) {
+        // Use provided/existing polygon coordinates
+        geeCoords = coordsToUse.map(c => [c.longitude, c.latitude]);
         geeCoords.push(geeCoords[0]); // close ring
-        console.log('[AgroCrop] Usando poligono', cropAreaMode, ':', polygonCoords.length, 'vertices');
         // Zoom to polygon center
-        const lats = polygonCoords.map(c => c.latitude);
-        const lngs = polygonCoords.map(c => c.longitude);
+        const lats = coordsToUse.map(c => c.latitude);
+        const lngs = coordsToUse.map(c => c.longitude);
         const cLat = (Math.min(...lats) + Math.max(...lats)) / 2;
         const cLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
         const dLat = (Math.max(...lats) - Math.min(...lats)) * 1.3;
@@ -204,7 +209,7 @@ export default function AgroCropDashboard() {
 
       // Step 1: Satellite query
       setCropStep('Procesando Sentinel-2... (30-60s)');
-      const result = await getBiomassAnalysis(geeCoords, cropFechaInicio, cropFechaFin, cropTipoCultivo);
+      const result = await getBiomassAnalysis(geeCoords, cropFechaInicio, cropFechaFin, tipoToUse);
       setCropData(result);
       triggerHaptic('light');
 
@@ -223,7 +228,7 @@ export default function AgroCropDashboard() {
         porcentaje_area_optima: result.porcentaje_area_optima,
         clasificacion_vigor: result.clasificacion_vigor,
       };
-      const tipoLabel = result.tipo_cultivo_label || cropTipoCultivo;
+      const tipoLabel = result.tipo_cultivo_label || tipoToUse;
       const claudeText = await analyzeCropBiomassWithClaude(biomassStats, tipoLabel);
       setCropClaudeAnalysis(claudeText);
       triggerHaptic('success');
@@ -385,7 +390,7 @@ ${(cropData as any).proyeccion ? `
 ━━━━━━━━━━━━━━━━━
 ${mangoSection}
 
-🤖 _Generado con AgroCrop v2.4_
+🤖 _Generado con AgroCrop v2.5_
 _Datos: ESA Copernicus, NASA, USGS_`;
 
       await Share.share({
@@ -1029,7 +1034,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
 
         {/* VERSION TAG */}
         <View style={styles.versionTag}>
-          <Text style={styles.versionTagText}>AgroCrop v2.4</Text>
+          <Text style={styles.versionTagText}>AgroCrop v2.5</Text>
         </View>
 
         {/* FLOATING MAP CONTROLS (RIGHT) */}
@@ -1233,11 +1238,9 @@ _Datos: ESA Copernicus, NASA, USGS_`;
                     </View>
                     <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
                       <TouchableOpacity style={[styles.parcelaActionBtn, { backgroundColor: COLORS.verdeSuave, borderColor: COLORS.verdeClaro }]} onPress={() => {
-                        setPolygonCoords(parcela.coordenadas);
-                        setCropTipoCultivo(parcela.tipo_cultivo);
                         setCropAreaMode('draw');
                         setShowParcelasModal(false);
-                        startCropAnalysis();
+                        startCropAnalysis(parcela.coordenadas, parcela.tipo_cultivo);
                       }}>
                         <Text style={[styles.parcelaActionText, { color: COLORS.verdeMedio }]}>Analizar</Text>
                       </TouchableOpacity>
@@ -1333,14 +1336,15 @@ _Datos: ESA Copernicus, NASA, USGS_`;
                 }}
                 disabled={newParcelName.length < 3 || !newParcelCultivo}
                 onPress={async () => {
-                  await guardarParcela(newParcelName, polygonCoords, newParcelCultivo);
-                  setCropTipoCultivo(newParcelCultivo);
+                  const savedCoords = [...polygonCoords];
+                  const savedCultivo = newParcelCultivo;
+                  await guardarParcela(newParcelName, savedCoords, savedCultivo);
                   setCropAreaMode('draw');
                   setShowSavePolygonModal(false);
                   setNewParcelName('');
                   setNewParcelCultivo('');
                   triggerHaptic('success');
-                  startCropAnalysis();
+                  startCropAnalysis(savedCoords, savedCultivo);
                 }}
               >
                 <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 15 }}>GUARDAR Y ANALIZAR AHORA</Text>
