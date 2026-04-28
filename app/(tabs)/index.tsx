@@ -229,7 +229,7 @@ export default function AgroCropDashboard() {
       triggerHaptic('success');
       setCropStep('');
 
-      // Update ultimo_analisis for matching saved parcel
+      // Update ultimo_analisis + resultado for matching saved parcel
       try {
         const stored = await AsyncStorage.getItem('mis_parcelas');
         if (stored) {
@@ -237,7 +237,16 @@ export default function AgroCropDashboard() {
           const updated = list.map((p: any) => {
             if (p.coordenadas && polygonCoords.length > 0 &&
                 Math.abs(p.coordenadas[0]?.latitude - polygonCoords[0]?.latitude) < 0.001) {
-              return { ...p, ultimo_analisis: new Date().toISOString() };
+              return {
+                ...p,
+                ultimo_analisis: new Date().toISOString(),
+                resultado_analisis: {
+                  tonelaje: result.tonelaje_estimado,
+                  rendimiento: result.rendimiento_por_hectarea,
+                  vigor: result.clasificacion_vigor,
+                  proyeccion: result.proyeccion,
+                },
+              };
             }
             return p;
           });
@@ -376,7 +385,7 @@ ${(cropData as any).proyeccion ? `
 ━━━━━━━━━━━━━━━━━
 ${mangoSection}
 
-🤖 _Generado con AgroCrop v2.3_
+🤖 _Generado con AgroCrop v2.4_
 _Datos: ESA Copernicus, NASA, USGS_`;
 
       await Share.share({
@@ -461,8 +470,8 @@ _Datos: ESA Copernicus, NASA, USGS_`;
 
   const finishCropDraw = () => {
     setCropDrawing(false);
-    selectMode('none');
-    setCropAreaMode('draw'); // ensure mode stays draw
+    setDrawingType('none'); // stop drawing but do NOT clear polygonCoords
+    setCropAreaMode('draw');
     console.log('[AgroCrop] Trazado finalizado:', polygonCoords.length, 'vertices');
     if (polygonCoords.length >= 3) {
       AsyncStorage.setItem('lastPolygon', JSON.stringify(polygonCoords));
@@ -1020,7 +1029,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
 
         {/* VERSION TAG */}
         <View style={styles.versionTag}>
-          <Text style={styles.versionTagText}>AgroCrop v2.3</Text>
+          <Text style={styles.versionTagText}>AgroCrop v2.4</Text>
         </View>
 
         {/* FLOATING MAP CONTROLS (RIGHT) */}
@@ -1211,19 +1220,40 @@ _Datos: ESA Copernicus, NASA, USGS_`;
                       <View style={[styles.parcelaColorDot, { backgroundColor: COLORS.verdeClaro }]} />
                       <View style={{ flex: 1 }}>
                         <Text style={styles.parcelaName}>{parcela.nombre}</Text>
-                        <Text style={styles.parcelaInfo}>{parcela.hectareas} ha - {parcela.tipo_cultivo}</Text>
-                        <Text style={{ color: '#999', fontSize: 11, marginTop: 2 }}>Creada: {new Date(parcela.fecha_creacion).toLocaleDateString()}</Text>
+                        <Text style={styles.parcelaInfo}>{parcela.hectareas} ha  {parcela.tipo_cultivo?.replace('_', ' ')}</Text>
+                        {parcela.ultimo_analisis ? (
+                          <Text style={{ color: COLORS.verdeClaro, fontSize: 11, marginTop: 2 }}>
+                            Analizado: {new Date(parcela.ultimo_analisis).toLocaleDateString()}
+                            {parcela.resultado_analisis ? ` - ${parcela.resultado_analisis.tonelaje?.toLocaleString()} ton` : ''}
+                          </Text>
+                        ) : (
+                          <Text style={{ color: '#999', fontSize: 11, marginTop: 2 }}>Sin analisis todavia</Text>
+                        )}
                       </View>
                     </View>
-                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                      <TouchableOpacity style={styles.parcelaActionBtn} onPress={() => {
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                      <TouchableOpacity style={[styles.parcelaActionBtn, { backgroundColor: COLORS.verdeSuave, borderColor: COLORS.verdeClaro }]} onPress={() => {
                         setPolygonCoords(parcela.coordenadas);
                         setCropTipoCultivo(parcela.tipo_cultivo);
                         setCropAreaMode('draw');
                         setShowParcelasModal(false);
                         startCropAnalysis();
                       }}>
-                        <Text style={styles.parcelaActionText}>Analizar</Text>
+                        <Text style={[styles.parcelaActionText, { color: COLORS.verdeMedio }]}>Analizar</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.parcelaActionBtn} onPress={() => {
+                        setPolygonCoords(parcela.coordenadas);
+                        const lats = parcela.coordenadas.map((c: Coordinate) => c.latitude);
+                        const lngs = parcela.coordenadas.map((c: Coordinate) => c.longitude);
+                        mapRef.current?.animateToRegion({
+                          latitude: (Math.min(...lats) + Math.max(...lats)) / 2,
+                          longitude: (Math.min(...lngs) + Math.max(...lngs)) / 2,
+                          latitudeDelta: (Math.max(...lats) - Math.min(...lats)) * 1.4,
+                          longitudeDelta: (Math.max(...lngs) - Math.min(...lngs)) * 1.4,
+                        }, 800);
+                        setShowParcelasModal(false);
+                      }}>
+                        <Text style={styles.parcelaActionText}>Ver en mapa</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={[styles.parcelaActionBtn, { borderColor: COLORS.rojo }]} onPress={() => borrarParcela(parcela.id)}>
                         <Text style={[styles.parcelaActionText, { color: COLORS.rojo }]}>Borrar</Text>

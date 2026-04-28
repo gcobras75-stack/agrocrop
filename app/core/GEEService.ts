@@ -477,6 +477,25 @@ export interface BiomassAnalysisResult {
   imagen_mas_reciente_global?: string;
   frescura_dias?: number;
   confianza_fusion?: string;
+  confianza_temporal?: string;
+  etapa_fenologica?: string;
+  margen_incertidumbre?: string;
+  metodo_composicion?: string;
+  proyeccion?: {
+    ton_ha: number;
+    tonelaje_proyectado: number;
+    incremento_pct: number;
+    rango_min: number;
+    rango_max: number;
+    confianza: string;
+    fecha_cosecha: string;
+    dias_a_cosecha: number;
+  };
+  clima_local?: {
+    temp_max_c: number | null;
+    precip_mm: number | null;
+    fuente: string;
+  };
 }
 
 /**
