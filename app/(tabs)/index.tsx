@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { StyleSheet, View, Text, ActivityIndicator, Platform, TouchableOpacity, Alert, Pressable, Modal, TextInput, ScrollView, Switch, Image, Share } from 'react-native';
+import { StyleSheet, View, Text, ActivityIndicator, Platform, TouchableOpacity, Alert, Modal, TextInput, ScrollView, Switch, Share } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
-import MapView, { Marker, Polygon, Region, MapPressEvent, PanDragEvent, UrlTile } from 'react-native-maps';
+import MapView, { Marker, Polygon, Region, MapPressEvent } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -10,12 +10,8 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as ImagePicker from 'expo-image-picker';
 import NetInfo from '@react-native-community/netinfo';
-// Mineral engine removed — AgroCrop only
-type MetalScore = { metal: string; label: string; icon: string; score_poligono: number; score_maximo: number; guideMineral?: string; warning?: string };
-type GeologicalIndicator = { label: string; status: string };
-const METAL_COLORS: Record<string, string> = {};
-import { initDB, getMuestras, saveMuestra, clearMuestras, savePoligonoCache, getPendingPolygons } from '../core/Database';
-import { analyzeRockImageWithClaude, ClaudeAnalysis, analyzeSpectralCandidatesBatch, askClaudeGeologist, analyzeCropBiomassWithClaude, CropBiomassStats } from '../core/ClaudeServices';
+import { initDB } from '../core/Database';
+import { askClaudeGeologist, analyzeCropBiomassWithClaude, CropBiomassStats } from '../core/ClaudeServices';
 import { getBiomassAnalysis, BiomassAnalysisResult, generateCirclePolygon, getBiomassGrid, GridCell, getBiomassExtended, BiomassExtendedResult } from '../core/GEEService';
 import { AgroCropPolygon, generatePolygonId, getPolygonColor, extractCoordsFromPhoto, calcConsolidatedSummary } from '../core/AgroCropService';
 
@@ -45,77 +41,9 @@ function calcPolygonArea(coords: Coordinate[]): number {
   return Math.abs(area / 2);
 }
 
-// ─── Tap-analysis pure helpers (module-level, no hooks) ──────────────────────
-
-const TAP_GLOBAL_MAX: Record<string, Record<string, number>> = {
-  oro:    { sierra: 92, playa: 78 },
-  plata:  { sierra: 71, playa: 45 },
-  cobre:  { sierra: 88, playa: 40 },
-  litio:  { sierra: 85, playa: 30 },
-  hierro: { sierra: 95, playa: 70 },
-};
-
-const TAP_METAL_META: Record<string, { label: string; icon: string; color: string }> = {
-  oro:    { label: 'ORO',    icon: '🥇', color: '#B7950B' },
-  plata:  { label: 'PLATA',  icon: '🥈', color: '#626567' },
-  cobre:  { label: 'COBRE',  icon: '🟤', color: '#A04000' },
-  litio:  { label: 'LITIO',  icon: '⚡', color: '#1E8449' },
-  hierro: { label: 'HIERRO', icon: '🔴', color: '#922B21' },
-};
-
-function tapPointScore(lat: number, lng: number, metal: string): number {
-  const s = (mult: number): number => {
-    const v = Math.abs(Math.sin(lat * 9301 * mult + lng * 49297 + metal.length * 233) * 233280);
-    return v - Math.floor(v);
-  };
-  return Math.round(
-    (s(1.0) * 0.30 + s(1.7) * 0.25 + s(2.3) * 0.20 + s(3.1) * 0.15 + s(4.2) * 0.10) * 100
-  );
-}
-
-function tapMessage(pct: number): { text: string; color: string } {
-  if (pct >= 80) return { text: '⭐ Anomalía fuerte — visita prioritaria',   color: '#C0392B' };
-  if (pct >= 65) return { text: '🟠 Señal significativa — planifica visita', color: '#E67E22' };
-  if (pct >= 45) return { text: '🟡 Señal moderada — registrar y comparar',  color: '#F39C12' };
-  if (pct >= 25) return { text: '🟢 Señal débil — baja prioridad',           color: '#27AE60' };
-  return              { text: '⚫ Sin anomalía detectable',                   color: '#7F8C8D' };
-}
-
-function getIndicatorsForPoint(
-  lat: number, lng: number, metal: string, terrain: string
-): { label: string; status: string }[] {
-  const s  = (m: number): number => Math.abs(Math.sin(lat * m + lng * m * 1.3) * 100) % 100;
-  const st = (m: number): string => s(m) > 35 ? '✅' : s(m) > 20 ? '⚠️' : '❌';
-  if (metal === 'oro' && terrain === 'sierra') return [
-    { label: 'Óxidos de hierro (GOSSAN)',  status: st(7.1)  },
-    { label: 'Alteración argílica',         status: st(11.3) },
-    { label: 'Cuarzo asociado',             status: st(13.7) },
-    { label: 'Anomalía térmica',            status: st(17.9) },
-  ];
-  if (metal === 'oro' && terrain === 'playa') return [
-    { label: 'Sedimento oscuro (magnetita)', status: st(7.1)  },
-    { label: 'Gradiente granulométrico',     status: st(11.3) },
-    { label: 'Zona de baja energía',         status: st(13.7) },
-  ];
-  if (metal === 'cobre') return [
-    { label: 'Malachita detectable',   status: st(7.1)  },
-    { label: 'Alteración propilítica', status: st(11.3) },
-    { label: 'Pórfido probable',       status: st(13.7) },
-  ];
-  if (metal === 'hierro') return [
-    { label: 'Óxidos de hierro', status: st(7.1)  },
-    { label: 'Hematita',         status: st(11.3) },
-    { label: 'Magnetita',        status: st(13.7) },
-  ];
-  return [
-    { label: 'Alteración argílica', status: st(7.1)  },
-    { label: 'Firma espectral',     status: st(11.3) },
-  ];
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function ProspectorDashboard() {
+export default function AgroCropDashboard() {
   const mapRef = useRef<MapView>(null);
   
   // --- Chat IA ---
@@ -132,49 +60,10 @@ export default function ProspectorDashboard() {
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
       const online = state.isConnected && state.isInternetReachable;
-      if (online && !isConnected && !isSyncing) {
-         syncPendingAnalyses();
-      }
       setIsConnected(!!online);
     });
     return () => unsubscribe();
-  }, [isConnected, isSyncing]);
-
-  const syncPendingAnalyses = async () => {
-    if (isSyncing || !useAI) return;
-    setIsSyncing(true);
-    try {
-      const pending = await getPendingPolygons();
-      if (pending.length > 0) triggerHaptic('medium');
-      for (const p of pending) {
-         const poly: any = p;
-         const coords = JSON.parse(poly.coordenadas);
-         const offlineData = JSON.parse(poly.analisis_resultado || '[]');
-         const claudeResults = await analyzeSpectralCandidatesBatch(offlineData, poly.mineral, poly.terrain, poly.rock_type || 'ignea');
-         if (claudeResults && claudeResults.length > 0) {
-            let finalPoints = offlineData.map((p: any) => {
-               const cr = claudeResults.find((c: any) => c.id === p.id);
-               if (cr) {
-                 p.score = cr.score;
-                 p.indices_analizados = cr.indices_analizados;
-                 p.analisis_integral = cr.analisis_integral;
-                 p.geologia_interpretada = cr.geologia_interpretada;
-                 p.recomendacion = cr.recomendacion;
-               }
-               return p;
-            });
-            finalPoints.sort((a: any, b: any) => b.score - a.score);
-            finalPoints.forEach((p: any, idx: number) => p.rank = idx + 1);
-            
-            await savePoligonoCache({
-               id: poly.id, mineral: poly.mineral, terrain: poly.terrain, rock_type: poly.rock_type,
-               coordenadas: coords, analisis_resultado: finalPoints, estado: 'SYNCED'
-            });
-         }
-      }
-      if (pending.length > 0) { triggerHaptic('success'); Alert.alert('Sincronización Completada', '¡Tus polígonos offline han sido actualizados por la IA!'); }
-    } catch(e) { } finally { setIsSyncing(false); }
-  };
+  }, []);
 
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [heading, setHeading] = useState<Location.LocationHeadingObject | null>(null);
@@ -184,58 +73,12 @@ export default function ProspectorDashboard() {
   const [drawingType, setDrawingType] = useState<DrawingType>('none');
   
   const [polygonCoords, setPolygonCoords] = useState<Coordinate[]>([]);
-  const [rectPointA, setRectPointA] = useState<Coordinate | null>(null);
-  const [rectPointB, setRectPointB] = useState<Coordinate | null>(null);
-
-  const [analysisPoints, setAnalysisPoints] = useState<any[]>([]);
-  const [metalScores, setMetalScores] = useState<MetalScore[]>([]);
-  const [showResults, setShowResults] = useState(false);
-
-  // Map tap point analysis
-  const [tapPoint, setTapPoint] = useState<{lat: number; lng: number} | null>(null);
-  const [tapScores, setTapScores] = useState<MetalScore[]>([]);
-  const [tapIndicators, setTapIndicators] = useState<GeologicalIndicator[]>([]);
-  const [selectedPoint, setSelectedPoint] = useState<any>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [mapRotation, setMapRotation] = useState(0);
-  const [showHeatmap, setShowHeatmap] = useState(false);
-  const [zoneColors, setZoneColors] = useState<any[]>([]);
-
-  // Topographical Map
-  const [showTopoModal, setShowTopoModal] = useState(false);
-  const [showTopoLayer, setShowTopoLayer] = useState(false);
-  const [topoOpacity, setTopoOpacity] = useState(0.6);
-
-  // Waypoints & Field Mode
-  const [isFieldMode, setIsFieldMode] = useState(false);
-  const [waypoints, setWaypoints] = useState<any[]>([]);
-  const [showWaypointModal, setShowWaypointModal] = useState(false);
-  const [waypointNote, setWaypointNote] = useState('');
-  
-  // AI & Camera States
-  const [sampleBase64, setSampleBase64] = useState<string|null>(null);
-  const [sampleCaptureType, setSampleCaptureType] = useState('normal'); 
-  const [isAiProcessing, setIsAiProcessing] = useState(false);
-  const [aiResult, setAiResult] = useState<ClaudeAnalysis | null>(null);
 
   // Settings & Configuration
   const [showConfigModal, setShowConfigModal] = useState(false);
-  const [activeProject, setActiveProject] = useState('Prospecto Alpha');
-  const [selectedMineral, setSelectedMineral] = useState('oro');
-  const [terrainType, setTerrainType] = useState('sierra');
-  const [depth, setDepth] = useState('0-5m');
-  const [rockType, setRockType] = useState('ignea');
-  
-  // AI, Database & Hardware Configuration
+  const [activeProject, setActiveProject] = useState('Mi Finca');
   const [useAI, setUseAI] = useState(true);
-  const [autoAnalyzeSample, setAutoAnalyzeSample] = useState(true);
-  const [uvLamp, setUvLamp] = useState('Ninguna'); 
-  const [microscopeConnected, setMicroscopeConnected] = useState(false);
-  const [autoSync, setAutoSync] = useState(false);
-  const [serverUrl, setServerUrl] = useState('https://prospector-ai.local');
-  
-  // History & Apperance
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [vibrationEnabled, setVibrationEnabled] = useState(true);
 
   // AgroCrop — Crop Biomass Analysis
@@ -723,36 +566,6 @@ _Datos: ESA Copernicus, NASA, USGS_`;
   const [currentZoom, setCurrentZoom] = useState(0.5);
   const showGridLabels = currentZoom < 0.5 && visibleGridPolygons.length <= 200;
 
-  const exportCSV = async () => {
-    if (waypoints.length === 0) {
-      Alert.alert('Vacío', 'No hay muestras en el historial para exportar.');
-      return;
-    }
-    triggerHaptic('heavy');
-    try {
-      let csvContent = "ID,Proyecto,Fecha,Latitud,Longitud,Altitud,Mineral_IA,Score_IA,Notas\n";
-      waypoints.forEach(wp => {
-        const date = new Date(wp.fecha_hora || wp.timestamp).toISOString();
-        const noteFixed = (wp.descripcion_texto || wp.note || '').replace(/,/g, ' ');
-        const proj = wp.proyecto_id || wp.project || 'No Asignado';
-        const lat = wp.lat || wp.latitude;
-        const lng = wp.lng || wp.longitude;
-        csvContent += `${wp.id},${proj},${date},${lat},${lng},${wp.altitud||0},${wp.mineral_detectado||'N/A'},${wp.score_ia||0},${noteFixed}\n`;
-      });
-      const fileUri = FileSystem.documentDirectory + 'ProspectorAI_Reporte.csv';
-      await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
-      const available = await Sharing.isAvailableAsync();
-      if (available) {
-        await Sharing.shareAsync(fileUri);
-      } else {
-        Alert.alert('Info', 'CSV Guardado en: ' + fileUri);
-      }
-    } catch (e) {
-      console.error(e);
-      Alert.alert('Error', 'Fallo al exportar reporte.');
-    }
-  };
-
   const triggerHaptic = (type: 'light' | 'medium' | 'heavy' | 'success') => {
     if (!vibrationEnabled) return;
     if (type === 'heavy') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -814,152 +627,28 @@ _Datos: ESA Copernicus, NASA, USGS_`;
           if (parsed.length > 0) setPolygonCoords(parsed);
         }
         await initDB();
-        await loadMuestras();
       } catch (e) {}
     };
     loadSaved();
   }, []);
-
-  const loadMuestras = async () => {
-    const data = await getMuestras();
-    setWaypoints(data);
-  };
-
-  const takeSamplePhoto = async (type: string) => {
-    setSampleCaptureType(type);
-    
-    // Solicitar permisos antes de abrir la cámara
-    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-    
-    if (permissionResult.granted === false) {
-      Alert.alert('Permiso Denegado', 'Se requiere acceso a la cámara para capturar muestras geológicas.');
-      return;
-    }
-
-    try {
-      let result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        quality: 0.6,
-        base64: true,
-      });
-
-      if (!result.canceled && result.assets && result.assets[0].base64) {
-        setSampleBase64(result.assets[0].base64);
-        if (useAI && autoAnalyzeSample) {
-           await runAI(result.assets[0].base64, type);
-        }
-      }
-    } catch (e: any) {
-      console.log("Error de Cámara:", e);
-      Alert.alert('Error Cámara', 'Ocurrió un error al intentar abrir la cámara nativa.');
-    }
-  };
-
-  const runAI = async (base64: string, type: string) => {
-    setIsAiProcessing(true);
-    triggerHaptic('medium');
-    try {
-      const analysis = await analyzeRockImageWithClaude(base64, type);
-      setAiResult(analysis);
-      triggerHaptic('success');
-    } catch (e: any) {
-      console.warn("AI Analysis Error:", e);
-      Alert.alert('Error IA', e.message || 'Error desconocido.');
-    } finally {
-      setIsAiProcessing(false);
-    }
-  };
-
-  const saveWaypoint = async () => {
-    if (!mapCenter) return;
-    
-    const newWp = {
-      id: Date.now().toString(),
-      proyecto_id: activeProject,
-      lat: mapCenter.latitude,
-      lng: mapCenter.longitude,
-      altitud: altitude,
-      rumbo: trueHeading,
-      fecha_hora: new Date().toISOString(),
-      tipo_captura: sampleCaptureType,
-      imagen_thumbnail: sampleBase64 ? 'data:image/jpeg;base64,' + sampleBase64.substring(0, 100) : '',
-      descripcion_texto: waypointNote,
-      analisis_ia: aiResult,
-      mineral_detectado: aiResult?.mineral_detectado || 'N/A',
-      score_ia: aiResult?.probabilidad || 0,
-    };
-    
-    await saveMuestra(newWp);
-    
-    setSampleBase64(null);
-    setAiResult(null);
-    setSampleCaptureType('normal');
-    setWaypointNote('');
-    setShowWaypointModal(false);
-    triggerHaptic('success');
-    await loadMuestras();
-  };
 
   const handleRegionChangeComplete = (region: Region) => {
     setMapCenter(region);
     updateGridViewport(region);
   };
 
-  const handleMapPress = (e: MapPressEvent) => {
-    const coord = e.nativeEvent.coordinate;
-
-    if (drawingType === 'rectangle') {
-      setRectPointA(coord);
-      setRectPointB(null);
-      return;
-    }
-
-    if (drawingType === 'none') {
-      const lat = coord.latitude;
-      const lng = coord.longitude;
-      const { scores, indicators } = computePointScore(lat, lng, terrainType);
-      setTapScores(scores);
-      setTapIndicators(indicators);
-      setTapPoint({ lat, lng });
-      setShowResults(false);
-      triggerHaptic('light');
-    }
-  };
-
-  const handlePanDrag = (e: PanDragEvent) => {
-    if (drawingType === 'rectangle') {
-      const coord = e.nativeEvent.coordinate;
-      if (!rectPointA) {
-        setRectPointA(coord);
-      } else {
-        setRectPointB(coord);
-      }
-    }
+  const handleMapPress = (_e: MapPressEvent) => {
+    // AgroCrop: map taps are no-op unless in polygon drawing mode (handled by crosshair)
   };
 
   const selectMode = (type: DrawingType) => {
     setPolygonCoords([]);
-    setRectPointA(null);
-    setRectPointB(null);
-    setAnalysisPoints([]);
-    setZoneColors([]);
-    setShowHeatmap(false);
-    setShowResults(false);
-    setTapPoint(null);
     setDrawingType(type);
   };
 
   const clearShapes = async () => {
     setPolygonCoords([]);
-    setRectPointA(null);
-    setRectPointB(null);
     setDrawingType('none');
-    setAnalysisPoints([]);
-    setZoneColors([]);
-    setShowHeatmap(false);
-    setShowResults(false);
-    setTapPoint(null);
     triggerHaptic('light');
     await AsyncStorage.removeItem('lastPolygon');
   };
@@ -1003,140 +692,17 @@ _Datos: ESA Copernicus, NASA, USGS_`;
     if (finalCoords.length >= 3) {
       triggerHaptic('success');
       await AsyncStorage.setItem('lastPolygon', JSON.stringify(finalCoords));
-      analyzeZone(finalCoords);
     }
   };
-
-  const analyzeZone = async (overrideCoords?: Coordinate[]) => {
-    console.log('=== INICIO ANALISIS OFFLINE ===');
-    const localCoords = overrideCoords || polygonCoords;
-    
-    if (localCoords.length < 3 && !(rectPointA && rectPointB)) {
-      Alert.alert('Error', 'Dibuja un polígono o rectángulo primero');
-      return;
-    }
-    
-    let coordsToUse: Coordinate[] = [];
-    if (drawingType === 'polygon' && localCoords.length >= 3) {
-      coordsToUse = localCoords;
-    } else if (drawingType === 'none' && localCoords.length >= 3) {
-      coordsToUse = localCoords;
-    } else if (rectPointA && rectPointB) {
-      coordsToUse = [
-        { latitude: rectPointA.latitude, longitude: rectPointA.longitude },
-        { latitude: rectPointA.latitude, longitude: rectPointB.longitude },
-        { latitude: rectPointB.latitude, longitude: rectPointB.longitude },
-        { latitude: rectPointB.latitude, longitude: rectPointA.longitude },
-      ];
-    }
-    
-    setIsAnalyzing(true);
-    
-    try {
-      await new Promise(resolve => setTimeout(resolve, 600));
-      const data = analyzeZoneLocal(coordsToUse, selectedMineral, terrainType, depth, rockType, waypoints);
-      
-      if (data.success && data.top_points) {
-        let finalPoints = data.top_points;
-        let wasAnalyzed = false;
-        
-        if (useAI && isConnected) {
-           try {
-              const claudeResults = await analyzeSpectralCandidatesBatch(data.top_points, selectedMineral, terrainType, rockType);
-              if (claudeResults && claudeResults.length > 0) {
-                 wasAnalyzed = true;
-                 finalPoints = data.top_points.map(p => {
-                    const cr = claudeResults.find(c => c.id === p.id);
-                    if (cr) {
-                      p.score = cr.score;
-                      p.indices_analizados = cr.indices_analizados;
-                      p.analisis_integral = cr.analisis_integral;
-                      p.geologia_interpretada = cr.geologia_interpretada;
-                      p.recomendacion = cr.recomendacion;
-                    }
-                    return p;
-                 });
-                 finalPoints.sort((a,b) => (b.score||0) - (a.score||0));
-                 finalPoints.forEach((p, idx) => p.rank = idx + 1);
-              }
-           } catch (e) {
-              console.log("Offline mode triggered due to AI error");
-           }
-        }
-        
-        await savePoligonoCache({
-           id: 'poly_' + Date.now(), mineral: selectedMineral, terrain: terrainType, rock_type: rockType,
-           coordenadas: coordsToUse, analisis_resultado: finalPoints, estado: wasAnalyzed ? 'SYNCED' : 'OFFLINE'
-        });
-
-        setAnalysisPoints(finalPoints);
-        setMetalScores(computeAllMetalScores(coordsToUse, terrainType));
-        const zonas: any[] = [];
-        const sourcePoints = data.all_points || data.top_points;
-        const latStep = data.grid_size ? data.grid_size.latStep / 2 : 0.0005;
-        const lngStep = data.grid_size ? data.grid_size.lngStep / 2 : 0.0005;
-
-        sourcePoints.forEach((point: any) => {
-          let color = 'rgba(68,255,68,0.4)'; // Verde (Baja prob)
-          const score = point.base_score || point.score || 0;
-          if (score > 80) color = 'rgba(255,68,68,0.6)';      // Rojo Intenso
-          else if (score > 60) color = 'rgba(255,165,0,0.5)'; // Naranja
-          else if (score > 40) color = 'rgba(255,221,68,0.4)'; // Amarillo
-          
-          zonas.push({
-            coordinates: [
-              { latitude: point.lat - latStep, longitude: point.lng - lngStep },
-              { latitude: point.lat - latStep, longitude: point.lng + lngStep },
-              { latitude: point.lat + latStep, longitude: point.lng + lngStep },
-              { latitude: point.lat + latStep, longitude: point.lng - lngStep },
-            ],
-            color: color
-          });
-        });
-        setZoneColors(zonas);
-        setShowHeatmap(true);
-        setShowResults(true);
-        triggerHaptic('success');
-        
-        mapRef.current?.animateToRegion({
-          latitude: data.top_points[0].lat,
-          longitude: data.top_points[0].lng,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        }, 800);
-        Alert.alert('Éxito', `Se descubrieron ${data.top_points.length} puntos potenciales`);
-      } else {
-        Alert.alert('Error', 'No se recibieron puntos');
-      }
-    } catch (error: any) {
-      console.error('Error:', error);
-      Alert.alert('Error', 'Conexión fallida: ' + error.message);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  // Geometry
-  let resolvedPolygonCoords = polygonCoords;
-  if (drawingType === 'rectangle' && rectPointA && rectPointB) {
-    resolvedPolygonCoords = [
-      { latitude: rectPointA.latitude, longitude: rectPointA.longitude },
-      { latitude: rectPointA.latitude, longitude: rectPointB.longitude },
-      { latitude: rectPointB.latitude, longitude: rectPointB.longitude },
-      { latitude: rectPointB.latitude, longitude: rectPointA.longitude },
-    ];
-  }
 
   // Calc stats
+  const resolvedPolygonCoords = polygonCoords;
   let areaM2 = 0;
   let infoText = "";
-  
-  if (resolvedPolygonCoords.length > 2 && (drawingType === 'polygon' || drawingType === 'none')) {
+
+  if (resolvedPolygonCoords.length > 2) {
     areaM2 = calcPolygonArea(resolvedPolygonCoords);
-    infoText = `Vértices: ${resolvedPolygonCoords.length}`;
-  } else if (drawingType === 'rectangle' && rectPointA && rectPointB) {
-    areaM2 = calcPolygonArea(resolvedPolygonCoords);
-    infoText = `Área diametral`;
+    infoText = `Vertices: ${resolvedPolygonCoords.length}`;
   }
 
   const areaHa = (areaM2 / 10000).toFixed(2);
@@ -1146,14 +712,13 @@ _Datos: ESA Copernicus, NASA, USGS_`;
   if (errorMsg) return <View style={styles.center}><Text style={styles.errorText}>{errorMsg}</Text></View>;
   if (!location) return (
     <View style={styles.center}>
-      <ActivityIndicator size="large" color="#FFD700" />
+      <ActivityIndicator size="large" color="#2d7a2d" />
       <Text style={styles.loadingText}>Calibrando GPS...</Text>
     </View>
   );
 
   const { latitude, longitude, altitude } = location.coords;
   const trueHeading = heading ? heading.trueHeading || heading.magHeading : 0;
-  const blockScroll = drawingType === 'rectangle';
 
   return (
     <View style={styles.container}>
@@ -1167,22 +732,11 @@ _Datos: ESA Copernicus, NASA, USGS_`;
           showsUserLocation={false}
           followsUserLocation={false}
           showsCompass={false}
-          scrollEnabled={!blockScroll}
           region={mapCenter || undefined}
           onRegionChange={(region: any) => { if (region.heading !== undefined) { setMapRotation(region.heading); } setCurrentZoom(region.latitudeDelta); }}
           onRegionChangeComplete={handleRegionChangeComplete}
           onPress={handleMapPress}
-          onPanDrag={handlePanDrag}
         >
-          {showTopoLayer && (
-            <UrlTile
-              urlTemplate="https://a.tile.opentopomap.org/{z}/{x}/{y}.png"
-              maximumZ={17}
-              zIndex={-1}
-              opacity={topoOpacity}
-            />
-          )}
-
           {location && (
             <Marker coordinate={{latitude: location.coords.latitude, longitude: location.coords.longitude}} anchor={{x: 0.5, y: 0.5}} zIndex={100} flat>
               <View style={{alignItems: 'center'}}>
@@ -1199,53 +753,17 @@ _Datos: ESA Copernicus, NASA, USGS_`;
           {resolvedPolygonCoords.length > 0 && (
             <Polygon
               coordinates={resolvedPolygonCoords}
-              strokeColor={showHeatmap && zoneColors.length > 0 ? "rgba(255,255,255,0.8)" : "#FFD700"}
-              fillColor={showHeatmap && zoneColors.length > 0 ? "transparent" : "rgba(255, 215, 0, 0.3)"}
-              strokeWidth={showHeatmap ? 2 : 3}
+              strokeColor="#2d7a2d"
+              fillColor="rgba(45, 122, 45, 0.3)"
+              strokeWidth={3}
               zIndex={3}
             />
           )}
 
-          {showHeatmap && zoneColors.map((zona: any, idx: number) => (
-            <Polygon 
-              key={`heat-${idx}`} 
-              coordinates={zona.coordinates} 
-              strokeColor="transparent" 
-              fillColor={zona.color} 
-              strokeWidth={0} 
-              zIndex={2} 
-            />
-          ))}
-
           {resolvedPolygonCoords.map((coord, i) => (
             <Marker key={`p-${i}`} coordinate={coord} anchor={{ x: 0.5, y: 0.5 }}>
-              <View style={[styles.numberedMarker, { backgroundColor: '#87CEFA', borderColor: '#FFF', width: 22, height: 22 }]}>
+              <View style={[styles.numberedMarker, { backgroundColor: '#4CAF50', borderColor: '#FFF', width: 22, height: 22 }]}>
                 <Text style={[styles.numberedMarkerText, { fontSize: 11 }]}>{i + 1}</Text>
-              </View>
-            </Marker>
-          ))}
-
-          {analysisPoints.map((point, idx) => (
-            <Marker 
-              key={idx} 
-              coordinate={{latitude: point.lat, longitude: point.lng}}
-              centerOffset={{x: 0, y: -14}}
-              onPress={() => { setSelectedPoint(point); setTapPoint(null); }}
-            >
-              <View style={{alignItems: 'center'}}>
-                 <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: '#FFD700', borderWidth: 1, borderColor: '#000', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.6, shadowRadius: 3, elevation: 5 }}>
-                   <Text style={{color:'#000', fontWeight:'bold', fontSize: 12}}>{point.rank}</Text>
-                 </View>
-                 <View style={{ width: 1.5, height: 8, backgroundColor: '#000' }} />
-                 <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#FFD700', borderWidth: 1, borderColor: '#000' }} />
-               </View>
-            </Marker>
-          ))}
-
-          {waypoints.map((wp) => (
-            <Marker key={wp.id} coordinate={{ latitude: wp.lat || wp.latitude || 0, longitude: wp.lng || wp.longitude || 0 }} title="MUESTRA" description={wp.note}>
-              <View style={styles.waypointMarker}>
-                <MaterialCommunityIcons name="pickaxe" size={20} color="#000" />
               </View>
             </Marker>
           ))}
@@ -1282,7 +800,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
         {/* CROSSHAIR */}
         {drawingType === 'polygon' && (
           <View style={styles.crosshairContainer} pointerEvents="none">
-            <MaterialCommunityIcons name="crosshairs" size={50} color="#FFD700" />
+            <MaterialCommunityIcons name="crosshairs" size={50} color="#2d7a2d" />
           </View>
         )}
 
@@ -1313,8 +831,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
 
         {/* DEBUG VERSION TAG */}
         <View style={{ position: 'absolute', top: 44, left: 10, backgroundColor: 'rgba(0,0,0,0.8)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4, zIndex: 50, maxWidth: 220 }}>
-          <Text style={{ color: '#4CAF50', fontSize: 9, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}>v9.0</Text>
-          <Text style={{ color: '#888', fontSize: 7, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', marginTop: 1 }} numberOfLines={1}>{process.env.EXPO_PUBLIC_SERVER_URL || 'ENV:null→fallback'}</Text>
+          <Text style={{ color: '#4CAF50', fontSize: 9, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}>AgroCrop v1.0</Text>
         </View>
 
 
