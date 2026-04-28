@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>ProspectorAI — Logo Sheet</title>
+<style>
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body { font-family: system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif; }
+
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    padding: 14mm 16mm 12mm;
+    page-break-after: always;
+  }
+
+  /* ── DARK PAGE ── */
+  .dark { background: #0A0A0A; color: #FFFFFF; }
+
+  /* ── LIGHT PAGE ── */
+  .light { background: #FFFFFF; color: #111111; }
+
+  /* ── HEADER ── */
+  .header { text-align: center; margin-bottom: 8mm; border-bottom: 0.5pt solid #D4A017; padding-bottom: 5mm; }
+  .header h1 { font-size: 20pt; font-weight: 800; letter-spacing: 0.5pt; }
+  .header h1 span { color: #D4A017; }
+  .header p  { font-size: 8pt; letter-spacing: 1.5pt; margin-top: 2mm; }
+  .dark  .header p { color: #888; }
+  .light .header p { color: #666; }
+
+  /* ── SECTION LABELS ── */
+  .section-label {
+    font-size: 7pt;
+    font-weight: 700;
+    letter-spacing: 1.5pt;
+    text-transform: uppercase;
+    margin-bottom: 3mm;
+    padding-bottom: 1.5mm;
+    border-bottom: 0.3pt solid currentColor;
+    opacity: 0.5;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* ── LOGO FULL ── */
+  .logo-full-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 7mm;
+    padding: 4mm;
+    border-radius: 6px;
+  }
+  .dark  .logo-full-wrap { border: 0.4pt solid #2A2A2A; }
+  .light .logo-full-wrap { border: 0.4pt solid #DDD; background: #0A0A0A; border-radius: 8px; }
+
+  .logo-full-wrap svg { max-width: 100%; height: auto; }
+
+  /* ── ICON LARGE ── */
+  .icon-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8mm;
+    margin-bottom: 7mm;
+  }
+  .icon-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2mm;
+  }
+  .icon-box label {
+    font-size: 6.5pt;
+    letter-spacing: 0.5pt;
+    opacity: 0.55;
+    text-align: center;
+  }
+  .icon-box svg { display: block; }
+
+  .icon-large { flex: 0 0 auto; }
+  .icon-large svg { width: 55mm; height: 55mm; }
+
+  .icon-small-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 5mm;
+    padding-top: 2mm;
+  }
+  .icon-small-pair { display: flex; gap: 6mm; align-items: flex-end; }
+
+  .icon-64  svg { width: 20mm; height: 20mm; }
+  .icon-32  svg { width: 10mm; height: 10mm; }
+  .icon-32-zoom svg { width: 20mm; height: 20mm; } /* 2× zoom for visual */
+
+  /* ── CONTEXT BOXES ── */
+  .context-row {
+    display: flex;
+    gap: 5mm;
+    margin-bottom: 7mm;
+  }
+  .context-box {
+    flex: 1;
+    padding: 4mm;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .ctx-dark  { background: #0A0A0A; }
+  .ctx-light { background: #FFFFFF; border: 0.4pt solid #DDD; }
+  .ctx-gold  { background: #D4A017; }
+  .context-box svg { width: 32mm; height: 32mm; }
+
+  /* ── PALETTE ── */
+  .palette {
+    display: flex;
+    gap: 4mm;
+    margin-bottom: 6mm;
+  }
+  .swatch {
+    flex: 1;
+    height: 9mm;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 6pt;
+    font-weight: 700;
+    gap: 1mm;
+  }
+  .sw-gold   { background: #D4A017; color: #000; }
+  .sw-cyan   { background: #00BFFF; color: #000; }
+  .sw-dark   { background: #0A0A0A; color: #FFF; border: 0.3pt solid #333; }
+  .sw-gray   { background: #888888; color: #FFF; }
+  .sw-white  { background: #FFFFFF; color: #000; border: 0.3pt solid #DDD; }
+
+  /* ── USAGE NOTES ── */
+  .usage-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4mm;
+    margin-bottom: 6mm;
+  }
+  .usage-box {
+    padding: 3mm 4mm;
+    border-radius: 5px;
+    font-size: 7pt;
+    line-height: 1.5;
+  }
+  .dark  .usage-box { background: #111; border: 0.3pt solid #222; color: #CCC; }
+  .light .usage-box { background: #F7F7F7; border: 0.3pt solid #E0E0E0; color: #444; }
+  .usage-box strong { color: #D4A017; font-size: 7.5pt; display: block; margin-bottom: 1mm; }
+
+  /* ── FOOTER ── */
+  .footer {
+    text-align: center;
+    font-size: 6.5pt;
+    letter-spacing: 1pt;
+    margin-top: auto;
+    padding-top: 4mm;
+    border-top: 0.3pt solid currentColor;
+    opacity: 0.3;
+  }
+
+  @media print {
+    .page { page-break-after: always; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- PAGE 1 — DARK BACKGROUND                                        -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="page dark">
+
+  <div class="header">
+    <h1>Prospector<span>AI</span> — Brand Identity</h1>
+    <p>LOGO SHEET &nbsp;·&nbsp; DARK BACKGROUND</p>
+  </div>
+
+  <!-- 01 Full Logo -->
+  <div class="section-label"><span>01 · FULL LOGO (horizontal lockup)</span><span>SVG · 480 × 120</span></div>
+  <div class="logo-full-wrap">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 120" width="440" height="110">
+  <defs>
+    <filter id="goldGlow_fl" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="cyanGlow_fl" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="1.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <pattern id="circuitBg_fl" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+      <rect width="20" height="20" fill="none"/>
+      <line x1="0" y1="10" x2="20" y2="10" stroke="#D4A017" stroke-width="0.15" stroke-opacity="0.08"/>
+      <line x1="10" y1="0" x2="10" y2="20" stroke="#D4A017" stroke-width="0.15" stroke-opacity="0.08"/>
+    </pattern>
+    <linearGradient id="mountainGrad_fl" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#D4A017" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#8B6A0F" stop-opacity="0.8"/>
+    </linearGradient>
+    <radialGradient id="crosshairGlow_fl" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00BFFF" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#00BFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="1" y="1" width="478" height="118" rx="8" ry="8" fill="#0A0A0A"/>
+  <rect x="1" y="1" width="478" height="118" rx="8" ry="8" fill="url(#circuitBg_fl)"/>
+  <rect x="1" y="1" width="478" height="118" rx="8" ry="8" fill="none" stroke="#D4A017" stroke-width="1" stroke-opacity="0.6"/>
+  <g transform="translate(12, 10)">
+    <circle cx="40" cy="52" r="32" fill="#00BFFF" fill-opacity="0.04" stroke="#00BFFF" stroke-width="0.5" stroke-opacity="0.2"/>
+    <circle cx="40" cy="52" r="24" fill="none" stroke="#00BFFF" stroke-width="0.4" stroke-opacity="0.15"/>
+    <ellipse cx="40" cy="22" rx="18" ry="6" fill="none" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.7" stroke-dasharray="3 2" filter="url(#cyanGlow_fl)"/>
+    <g transform="translate(55, 19)" filter="url(#cyanGlow_fl)">
+      <rect x="-3" y="-2" width="6" height="4" rx="1" fill="#00BFFF" fill-opacity="0.9"/>
+      <rect x="-7" y="-1" width="3" height="2" rx="0.5" fill="#00BFFF" fill-opacity="0.6"/>
+      <rect x="4" y="-1" width="3" height="2" rx="0.5" fill="#00BFFF" fill-opacity="0.6"/>
+    </g>
+    <path d="M24 85 L28 78 L32 82 Z" fill="#D4A017" fill-opacity="0.25"/>
+    <line x1="30" y1="80" x2="42" y2="86" stroke="#D4A017" stroke-width="1" stroke-opacity="0.25" stroke-linecap="round"/>
+    <path d="M40 84 L44 79 L46 84 Z" fill="#D4A017" fill-opacity="0.2"/>
+    <path d="M40 25 L14 78 L40 78 Z" fill="url(#mountainGrad_fl)" fill-opacity="0.85"/>
+    <path d="M40 25 L66 78 L40 78 Z" fill="#8B6A0F" fill-opacity="0.75"/>
+    <line x1="40" y1="25" x2="40" y2="78" stroke="#D4A017" stroke-width="0.6" stroke-opacity="0.4"/>
+    <g stroke="#D4A017" stroke-opacity="0.55" stroke-width="0.8" fill="none" stroke-linecap="round">
+      <line x1="27" y1="55" x2="36" y2="55"/>
+      <line x1="22" y1="65" x2="36" y2="65"/>
+      <line x1="25" y1="72" x2="36" y2="72"/>
+      <line x1="30" y1="55" x2="30" y2="65"/>
+      <line x1="35" y1="65" x2="35" y2="72"/>
+      <circle cx="30" cy="55" r="1.2" fill="#D4A017" fill-opacity="0.7" stroke="none"/>
+      <circle cx="35" cy="65" r="1.2" fill="#D4A017" fill-opacity="0.7" stroke="none"/>
+      <circle cx="27" cy="72" r="1" fill="#D4A017" fill-opacity="0.7" stroke="none"/>
+    </g>
+    <g stroke="#8B6A0F" stroke-opacity="0.6" stroke-width="0.8" fill="none" stroke-linecap="round">
+      <line x1="44" y1="55" x2="53" y2="55"/>
+      <line x1="44" y1="65" x2="57" y2="65"/>
+      <line x1="44" y1="72" x2="54" y2="72"/>
+      <line x1="50" y1="55" x2="50" y2="65"/>
+      <line x1="45" y1="65" x2="45" y2="72"/>
+      <circle cx="50" cy="55" r="1.2" fill="#8B6A0F" fill-opacity="0.8" stroke="none"/>
+      <circle cx="45" cy="65" r="1.2" fill="#8B6A0F" fill-opacity="0.8" stroke="none"/>
+      <circle cx="54" cy="72" r="1" fill="#8B6A0F" fill-opacity="0.8" stroke="none"/>
+    </g>
+    <path d="M40 25 L14 78 L66 78 Z" fill="none" stroke="#D4A017" stroke-width="1.2" stroke-linejoin="round" filter="url(#goldGlow_fl)" stroke-opacity="0.9"/>
+    <circle cx="40" cy="25" r="9" fill="url(#crosshairGlow_fl)"/>
+    <circle cx="40" cy="25" r="7" fill="none" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.8" filter="url(#cyanGlow_fl)"/>
+    <circle cx="40" cy="25" r="4" fill="none" stroke="#00BFFF" stroke-width="0.8" stroke-opacity="0.9"/>
+    <line x1="40" y1="16" x2="40" y2="20" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.9" stroke-linecap="round" filter="url(#cyanGlow_fl)"/>
+    <line x1="40" y1="30" x2="40" y2="34" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.9" stroke-linecap="round" filter="url(#cyanGlow_fl)"/>
+    <line x1="31" y1="25" x2="35" y2="25" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.9" stroke-linecap="round" filter="url(#cyanGlow_fl)"/>
+    <line x1="45" y1="25" x2="49" y2="25" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.9" stroke-linecap="round" filter="url(#cyanGlow_fl)"/>
+    <circle cx="40" cy="25" r="1.8" fill="#00BFFF" filter="url(#cyanGlow_fl)"/>
+  </g>
+  <line x1="96" y1="20" x2="96" y2="100" stroke="#D4A017" stroke-width="0.5" stroke-opacity="0.4"/>
+  <g transform="translate(108, 0)">
+    <text y="62" font-family="system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="38" letter-spacing="-0.5" fill="#FFFFFF">Prospector</text>
+    <text x="253" y="62" font-family="system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="38" letter-spacing="-0.5" fill="#D4A017" filter="url(#goldGlow_fl)">AI</text>
+    <text y="82" font-family="system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="400" font-size="11" letter-spacing="1.5" fill="#888888">MINERAL INTELLIGENCE · SATELLITE GRADE</text>
+  </g>
+</svg>
+  </div>
+
+  <!-- 02 App Icon + Small sizes -->
+  <div class="section-label"><span>02 · APP ICON &amp; SMALL SIZES</span><span>1024 · 64 · 32 px</span></div>
+  <div class="icon-row">
+
+    <!-- Large icon -->
+    <div class="icon-box icon-large">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="55mm" height="55mm">
+  <defs>
+    <filter id="gGold_p1" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="0.8" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="gCyan_p1" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="1" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="mL64_p1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#D4A017"/>
+      <stop offset="100%" stop-color="#8B6A0F"/>
+    </linearGradient>
+    <linearGradient id="mR64_p1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#9B7A10"/>
+      <stop offset="100%" stop-color="#4A3A07"/>
+    </linearGradient>
+    <radialGradient id="peakGlowSm_p1" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00BFFF" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#00BFFF" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="rr64_p1">
+      <rect x="0" y="0" width="64" height="64" rx="14" ry="14"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#rr64_p1)">
+    <rect width="64" height="64" fill="#0A0A0A"/>
+    <ellipse cx="32" cy="11" rx="16" ry="5" fill="none" stroke="#00BFFF" stroke-width="0.7" stroke-opacity="0.5" stroke-dasharray="3 2"/>
+    <g transform="translate(46, 9)">
+      <rect x="-3" y="-2" width="6" height="4" rx="1" fill="#00BFFF" fill-opacity="0.85"/>
+      <rect x="-6" y="-1" width="2.5" height="2" rx="0.5" fill="#00BFFF" fill-opacity="0.6"/>
+      <rect x="3.5" y="-1" width="2.5" height="2" rx="0.5" fill="#00BFFF" fill-opacity="0.6"/>
+    </g>
+    <polygon points="32,17 9,52 32,52" fill="url(#mL64_p1)" fill-opacity="0.92"/>
+    <polygon points="32,17 55,52 32,52" fill="url(#mR64_p1)" fill-opacity="0.88"/>
+    <line x1="32" y1="17" x2="32" y2="52" stroke="#D4A017" stroke-width="0.5" stroke-opacity="0.25"/>
+    <g stroke="#D4A017" stroke-opacity="0.55" stroke-width="0.8" fill="none" stroke-linecap="round">
+      <line x1="18" y1="33" x2="31" y2="33"/>
+      <line x1="13" y1="42" x2="31" y2="42"/>
+      <line x1="22" y1="33" x2="22" y2="42"/>
+      <circle cx="22" cy="33" r="1" fill="#D4A017" stroke="none"/>
+    </g>
+    <g stroke="#8B6A0F" stroke-opacity="0.55" stroke-width="0.8" fill="none" stroke-linecap="round">
+      <line x1="33" y1="33" x2="46" y2="33"/>
+      <line x1="33" y1="42" x2="51" y2="42"/>
+      <line x1="42" y1="33" x2="42" y2="42"/>
+      <circle cx="42" cy="33" r="1" fill="#8B6A0F" stroke="none"/>
+    </g>
+    <polygon points="32,17 9,52 55,52" fill="none" stroke="#D4A017" stroke-width="1.2" stroke-linejoin="round" filter="url(#gGold_p1)" stroke-opacity="0.9"/>
+    <circle cx="32" cy="17" r="8" fill="url(#peakGlowSm_p1)"/>
+    <circle cx="32" cy="17" r="5.5" fill="none" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.85" filter="url(#gCyan_p1)"/>
+    <circle cx="32" cy="17" r="3" fill="none" stroke="#00BFFF" stroke-width="0.8" stroke-opacity="0.9"/>
+    <line x1="32" y1="9"  x2="32" y2="12.5" stroke="#00BFFF" stroke-width="1" stroke-linecap="round" filter="url(#gCyan_p1)" stroke-opacity="0.9"/>
+    <line x1="32" y1="21.5" x2="32" y2="25" stroke="#00BFFF" stroke-width="1" stroke-linecap="round" filter="url(#gCyan_p1)" stroke-opacity="0.9"/>
+    <line x1="24" y1="17" x2="27" y2="17" stroke="#00BFFF" stroke-width="1" stroke-linecap="round" filter="url(#gCyan_p1)" stroke-opacity="0.9"/>
+    <line x1="37" y1="17" x2="40" y2="17" stroke="#00BFFF" stroke-width="1" stroke-linecap="round" filter="url(#gCyan_p1)" stroke-opacity="0.9"/>
+    <circle cx="32" cy="17" r="1.5" fill="#00BFFF"/>
+    <circle cx="32" cy="17" r="0.8" fill="white" fill-opacity="0.9"/>
+    <rect x="0.5" y="0.5" width="63" height="63" rx="13.5" ry="13.5" fill="none" stroke="#D4A017" stroke-width="0.8" stroke-opacity="0.5"/>
+  </g>
+</svg>
+      <label>App Icon · 64px proxy</label>
+    </div>
+
+    <!-- Small icons column -->
+    <div class="icon-small-group">
+      <div>
+        <div style="font-size:7pt;opacity:0.5;margin-bottom:2mm;font-weight:700;letter-spacing:1pt;">ICON 64 × 64 — actual size</div>
+        <div style="display:flex;gap:4mm;align-items:center;">
+          <div class="icon-box">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <filter id="gGold_64a" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="0.8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="gCyan_64a" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="mL64a" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#D4A017"/><stop offset="100%" stop-color="#8B6A0F"/></linearGradient>
+    <linearGradient id="mR64a" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#9B7A10"/><stop offset="100%" stop-color="#4A3A07"/></linearGradient>
+    <radialGradient id="pg64a" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#00BFFF" stop-opacity="0.4"/><stop offset="100%" stop-color="#00BFFF" stop-opacity="0"/></radialGradient>
+    <clipPath id="rr64a"><rect x="0" y="0" width="64" height="64" rx="14" ry="14"/></clipPath>
+  </defs>
+  <g clip-path="url(#rr64a)">
+    <rect width="64" height="64" fill="#0A0A0A"/>
+    <ellipse cx="32" cy="11" rx="16" ry="5" fill="none" stroke="#00BFFF" stroke-width="0.7" stroke-opacity="0.5" stroke-dasharray="3 2"/>
+    <g transform="translate(46, 9)"><rect x="-3" y="-2" width="6" height="4" rx="1" fill="#00BFFF" fill-opacity="0.85"/><rect x="-6" y="-1" width="2.5" height="2" rx="0.5" fill="#00BFFF" fill-opacity="0.6"/><rect x="3.5" y="-1" width="2.5" height="2" rx="0.5" fill="#00BFFF" fill-opacity="0.6"/></g>
+    <polygon points="32,17 9,52 32,52" fill="url(#mL64a)" fill-opacity="0.92"/>
+    <polygon points="32,17 55,52 32,52" fill="url(#mR64a)" fill-opacity="0.88"/>
+    <g stroke="#D4A017" stroke-opacity="0.55" stroke-width="0.8" fill="none" stroke-linecap="round"><line x1="18" y1="33" x2="31" y2="33"/><line x1="13" y1="42" x2="31" y2="42"/><line x1="22" y1="33" x2="22" y2="42"/><circle cx="22" cy="33" r="1" fill="#D4A017" stroke="none"/></g>
+    <g stroke="#8B6A0F" stroke-opacity="0.55" stroke-width="0.8" fill="none" stroke-linecap="round"><line x1="33" y1="33" x2="46" y2="33"/><line x1="33" y1="42" x2="51" y2="42"/><line x1="42" y1="33" x2="42" y2="42"/><circle cx="42" cy="33" r="1" fill="#8B6A0F" stroke="none"/></g>
+    <polygon points="32,17 9,52 55,52" fill="none" stroke="#D4A017" stroke-width="1.2" stroke-linejoin="round" filter="url(#gGold_64a)" stroke-opacity="0.9"/>
+    <circle cx="32" cy="17" r="8" fill="url(#pg64a)"/>
+    <circle cx="32" cy="17" r="5.5" fill="none" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.85" filter="url(#gCyan_64a)"/>
+    <circle cx="32" cy="17" r="3" fill="none" stroke="#00BFFF" stroke-width="0.8" stroke-opacity="0.9"/>
+    <line x1="32" y1="9" x2="32" y2="12.5" stroke="#00BFFF" stroke-width="1" stroke-linecap="round" filter="url(#gCyan_64a)" stroke-opacity="0.9"/>
+    <line x1="32" y1="21.5" x2="32" y2="25" stroke="#00BFFF" stroke-width="1" stroke-linecap="round" filter="url(#gCyan_64a)" stroke-opacity="0.9"/>
+    <line x1="24" y1="17" x2="27" y2="17" stroke="#00BFFF" stroke-width="1" stroke-linecap="round" filter="url(#gCyan_64a)" stroke-opacity="0.9"/>
+    <line x1="37" y1="17" x2="40" y2="17" stroke="#00BFFF" stroke-width="1" stroke-linecap="round" filter="url(#gCyan_64a)" stroke-opacity="0.9"/>
+    <circle cx="32" cy="17" r="1.5" fill="#00BFFF"/>
+    <circle cx="32" cy="17" r="0.8" fill="white" fill-opacity="0.9"/>
+    <rect x="0.5" y="0.5" width="63" height="63" rx="13.5" ry="13.5" fill="none" stroke="#D4A017" stroke-width="0.8" stroke-opacity="0.5"/>
+  </g>
+</svg>
+            <label>64 × 64 actual</label>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:7pt;opacity:0.5;margin-bottom:2mm;font-weight:700;letter-spacing:1pt;">FAVICON 32 × 32 — actual &amp; 2× zoom</div>
+        <div style="display:flex;gap:5mm;align-items:center;">
+          <!-- actual 32px -->
+          <div class="icon-box">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <filter id="g1_p1" x="-25%" y="-25%" width="150%" height="150%"><feGaussianBlur stdDeviation="0.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="mL32_p1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#D4A017"/><stop offset="100%" stop-color="#8B6A0F"/></linearGradient>
+    <linearGradient id="mR32_p1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#9B7A10"/><stop offset="100%" stop-color="#4A3A07"/></linearGradient>
+    <clipPath id="rr32_p1"><rect x="0" y="0" width="32" height="32" rx="7" ry="7"/></clipPath>
+  </defs>
+  <g clip-path="url(#rr32_p1)">
+    <rect width="32" height="32" fill="#0A0A0A"/>
+    <polygon points="16,7 3,27 16,27" fill="url(#mL32_p1)" fill-opacity="0.95"/>
+    <polygon points="16,7 29,27 16,27" fill="url(#mR32_p1)" fill-opacity="0.9"/>
+    <line x1="9" y1="19" x2="15" y2="19" stroke="#D4A017" stroke-width="0.7" stroke-opacity="0.55"/>
+    <line x1="17" y1="19" x2="23" y2="19" stroke="#B8860B" stroke-width="0.7" stroke-opacity="0.5"/>
+    <circle cx="12" cy="19" r="0.8" fill="#D4A017" fill-opacity="0.7"/>
+    <circle cx="20" cy="19" r="0.8" fill="#B8860B" fill-opacity="0.7"/>
+    <polygon points="16,7 3,27 29,27" fill="none" stroke="#D4A017" stroke-width="1.1" stroke-linejoin="round" filter="url(#g1_p1)" stroke-opacity="0.95"/>
+    <circle cx="16" cy="7" r="4" fill="none" stroke="#00BFFF" stroke-width="0.9" stroke-opacity="0.9" filter="url(#g1_p1)"/>
+    <line x1="16" y1="1"  x2="16" y2="4.2" stroke="#00BFFF" stroke-width="0.9" stroke-linecap="round" filter="url(#g1_p1)"/>
+    <line x1="16" y1="9.8" x2="16" y2="13" stroke="#00BFFF" stroke-width="0.9" stroke-linecap="round" filter="url(#g1_p1)"/>
+    <line x1="10" y1="7"  x2="13.2" y2="7" stroke="#00BFFF" stroke-width="0.9" stroke-linecap="round" filter="url(#g1_p1)"/>
+    <line x1="18.8" y1="7" x2="22" y2="7" stroke="#00BFFF" stroke-width="0.9" stroke-linecap="round" filter="url(#g1_p1)"/>
+    <circle cx="16" cy="7" r="1.4" fill="#00BFFF" filter="url(#g1_p1)"/>
+    <circle cx="16" cy="7" r="0.7" fill="white" fill-opacity="0.95"/>
+    <rect x="0.5" y="0.5" width="31" height="31" rx="6.5" ry="6.5" fill="none" stroke="#D4A017" stroke-width="0.7" stroke-opacity="0.5"/>
+  </g>
+</svg>
+            <label>32 × 32 actual</label>
+          </div>
+
+          <!-- 2× zoom for clarity -->
+          <div class="icon-box">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="64" height="64">
+  <defs>
+    <filter id="g1_p1z" x="-25%" y="-25%" width="150%" height="150%"><feGaussianBlur stdDeviation="0.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="mL32_p1z" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#D4A017"/><stop offset="100%" stop-color="#8B6A0F"/></linearGradient>
+    <linearGradient id="mR32_p1z" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#9B7A10"/><stop offset="100%" stop-color="#4A3A07"/></linearGradient>
+    <clipPath id="rr32_p1z"><rect x="0" y="0" width="32" height="32" rx="7" ry="7"/></clipPath>
+  </defs>
+  <g clip-path="url(#rr32_p1z)">
+    <rect width="32" height="32" fill="#0A0A0A"/>
+    <polygon points="16,7 3,27 16,27" fill="url(#mL32_p1z)" fill-opacity="0.95"/>
+    <polygon points="16,7 29,27 16,27" fill="url(#mR32_p1z)" fill-opacity="0.9"/>
+    <line x1="9" y1="19" x2="15" y2="19" stroke="#D4A017" stroke-width="0.7" stroke-opacity="0.55"/>
+    <line x1="17" y1="19" x2="23" y2="19" stroke="#B8860B" stroke-width="0.7" stroke-opacity="0.5"/>
+    <circle cx="12" cy="19" r="0.8" fill="#D4A017" fill-opacity="0.7"/>
+    <circle cx="20" cy="19" r="0.8" fill="#B8860B" fill-opacity="0.7"/>
+    <polygon points="16,7 3,27 29,27" fill="none" stroke="#D4A017" stroke-width="1.1" stroke-linejoin="round" filter="url(#g1_p1z)" stroke-opacity="0.95"/>
+    <circle cx="16" cy="7" r="4" fill="none" stroke="#00BFFF" stroke-width="0.9" stroke-opacity="0.9" filter="url(#g1_p1z)"/>
+    <line x1="16" y1="1"  x2="16" y2="4.2" stroke="#00BFFF" stroke-width="0.9" stroke-linecap="round" filter="url(#g1_p1z)"/>
+    <line x1="16" y1="9.8" x2="16" y2="13" stroke="#00BFFF" stroke-width="0.9" stroke-linecap="round" filter="url(#g1_p1z)"/>
+    <line x1="10" y1="7"  x2="13.2" y2="7" stroke="#00BFFF" stroke-width="0.9" stroke-linecap="round" filter="url(#g1_p1z)"/>
+    <line x1="18.8" y1="7" x2="22" y2="7" stroke="#00BFFF" stroke-width="0.9" stroke-linecap="round" filter="url(#g1_p1z)"/>
+    <circle cx="16" cy="7" r="1.4" fill="#00BFFF" filter="url(#g1_p1z)"/>
+    <circle cx="16" cy="7" r="0.7" fill="white" fill-opacity="0.95"/>
+    <rect x="0.5" y="0.5" width="31" height="31" rx="6.5" ry="6.5" fill="none" stroke="#D4A017" stroke-width="0.7" stroke-opacity="0.5"/>
+  </g>
+</svg>
+            <label>32 × 32 at 2× zoom</label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 03 Color Palette -->
+  <div class="section-label"><span>03 · COLOR PALETTE</span><span>Brand Colors</span></div>
+  <div class="palette" style="margin-bottom:6mm;">
+    <div class="swatch sw-gold"><span>#D4A017</span><span>Gold · Primary</span></div>
+    <div class="swatch sw-cyan"><span>#00BFFF</span><span>Cyan · Satellite</span></div>
+    <div class="swatch sw-dark"><span>#0A0A0A</span><span>Dark · Background</span></div>
+    <div class="swatch sw-gray"><span>#888888</span><span>Gray · Secondary</span></div>
+    <div class="swatch sw-white"><span>#FFFFFF</span><span>White · Text</span></div>
+  </div>
+
+  <!-- 04 Usage notes -->
+  <div class="section-label"><span>04 · USAGE NOTES</span><span></span></div>
+  <div class="usage-grid">
+    <div class="usage-box"><strong>App Icon</strong>Use icon-1024.svg for App Store / Play Store submissions. Scale down to 64px for notifications and tab bars.</div>
+    <div class="usage-box"><strong>Full Logo</strong>Use logo-full.svg on splash screens, onboarding, and marketing materials. Minimum width: 200px.</div>
+    <div class="usage-box"><strong>Dark Backgrounds</strong>All versions are optimized for dark (#0A0A0A) backgrounds. Gold glow effects are most visible here.</div>
+    <div class="usage-box"><strong>Light Backgrounds</strong>Place the icon inside its dark rounded-square container when using on light backgrounds. Never place bare on white.</div>
+  </div>
+
+  <div class="footer">ProspectorAI &nbsp;·&nbsp; Mineral Intelligence &nbsp;·&nbsp; Satellite Grade &nbsp;·&nbsp; assets/branding/</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- PAGE 2 — LIGHT BACKGROUND                                       -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="page light">
+
+  <div class="header">
+    <h1>Prospector<span>AI</span> — Brand Identity</h1>
+    <p style="color:#666;">LOGO SHEET &nbsp;·&nbsp; LIGHT BACKGROUND</p>
+  </div>
+
+  <!-- 01 Full Logo on white -->
+  <div class="section-label" style="color:#444;"><span>01 · FULL LOGO — on light background</span><span>SVG · 480 × 120</span></div>
+  <div class="logo-full-wrap" style="background:#0A0A0A; border-radius:10px; padding:6mm; border:none; margin-bottom:7mm;">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 120" width="440" height="110">
+  <defs>
+    <filter id="goldGlow_p2" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="cyanGlow_p2" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="1.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="mountainGrad_p2" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#D4A017" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#8B6A0F" stop-opacity="0.8"/>
+    </linearGradient>
+    <radialGradient id="crosshairGlow_p2" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00BFFF" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#00BFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="0" y="0" width="480" height="120" fill="#0A0A0A"/>
+  <g transform="translate(12, 10)">
+    <circle cx="40" cy="52" r="32" fill="#00BFFF" fill-opacity="0.04" stroke="#00BFFF" stroke-width="0.5" stroke-opacity="0.2"/>
+    <ellipse cx="40" cy="22" rx="18" ry="6" fill="none" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.7" stroke-dasharray="3 2" filter="url(#cyanGlow_p2)"/>
+    <g transform="translate(55, 19)" filter="url(#cyanGlow_p2)">
+      <rect x="-3" y="-2" width="6" height="4" rx="1" fill="#00BFFF" fill-opacity="0.9"/>
+      <rect x="-7" y="-1" width="3" height="2" rx="0.5" fill="#00BFFF" fill-opacity="0.6"/>
+      <rect x="4" y="-1" width="3" height="2" rx="0.5" fill="#00BFFF" fill-opacity="0.6"/>
+    </g>
+    <path d="M40 25 L14 78 L40 78 Z" fill="url(#mountainGrad_p2)" fill-opacity="0.85"/>
+    <path d="M40 25 L66 78 L40 78 Z" fill="#8B6A0F" fill-opacity="0.75"/>
+    <g stroke="#D4A017" stroke-opacity="0.55" stroke-width="0.8" fill="none" stroke-linecap="round">
+      <line x1="27" y1="55" x2="36" y2="55"/><line x1="22" y1="65" x2="36" y2="65"/>
+      <line x1="30" y1="55" x2="30" y2="65"/>
+      <circle cx="30" cy="55" r="1.2" fill="#D4A017" fill-opacity="0.7" stroke="none"/>
+    </g>
+    <path d="M40 25 L14 78 L66 78 Z" fill="none" stroke="#D4A017" stroke-width="1.2" stroke-linejoin="round" filter="url(#goldGlow_p2)" stroke-opacity="0.9"/>
+    <circle cx="40" cy="25" r="9" fill="url(#crosshairGlow_p2)"/>
+    <circle cx="40" cy="25" r="7" fill="none" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.8" filter="url(#cyanGlow_p2)"/>
+    <circle cx="40" cy="25" r="4" fill="none" stroke="#00BFFF" stroke-width="0.8" stroke-opacity="0.9"/>
+    <line x1="40" y1="16" x2="40" y2="20" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.9" stroke-linecap="round" filter="url(#cyanGlow_p2)"/>
+    <line x1="40" y1="30" x2="40" y2="34" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.9" stroke-linecap="round" filter="url(#cyanGlow_p2)"/>
+    <line x1="31" y1="25" x2="35" y2="25" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.9" stroke-linecap="round" filter="url(#cyanGlow_p2)"/>
+    <line x1="45" y1="25" x2="49" y2="25" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.9" stroke-linecap="round" filter="url(#cyanGlow_p2)"/>
+    <circle cx="40" cy="25" r="1.8" fill="#00BFFF" filter="url(#cyanGlow_p2)"/>
+  </g>
+  <line x1="96" y1="20" x2="96" y2="100" stroke="#D4A017" stroke-width="0.5" stroke-opacity="0.4"/>
+  <g transform="translate(108, 0)">
+    <text y="62" font-family="system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif" font-weight="700" font-size="38" letter-spacing="-0.5" fill="#FFFFFF">Prospector</text>
+    <text x="253" y="62" font-family="system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif" font-weight="700" font-size="38" letter-spacing="-0.5" fill="#D4A017" filter="url(#goldGlow_p2)">AI</text>
+    <text y="82" font-family="system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif" font-weight="400" font-size="11" letter-spacing="1.5" fill="#888888">MINERAL INTELLIGENCE · SATELLITE GRADE</text>
+  </g>
+</svg>
+  </div>
+
+  <!-- 02 Icons on different bg colours -->
+  <div class="section-label" style="color:#444;"><span>02 · ICON ON VARIOUS BACKGROUNDS</span><span>Placement tests</span></div>
+  <div class="context-row" style="margin-bottom:7mm;">
+    <div class="context-box ctx-dark">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="80" height="80">
+  <defs>
+    <filter id="gG_ctx1" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="0.8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="gC_ctx1" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="mLc1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#D4A017"/><stop offset="100%" stop-color="#8B6A0F"/></linearGradient>
+    <linearGradient id="mRc1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#9B7A10"/><stop offset="100%" stop-color="#4A3A07"/></linearGradient>
+    <radialGradient id="pgc1" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#00BFFF" stop-opacity="0.4"/><stop offset="100%" stop-color="#00BFFF" stop-opacity="0"/></radialGradient>
+    <clipPath id="rrc1"><rect x="0" y="0" width="64" height="64" rx="14" ry="14"/></clipPath>
+  </defs>
+  <g clip-path="url(#rrc1)">
+    <rect width="64" height="64" fill="#0A0A0A"/>
+    <ellipse cx="32" cy="11" rx="16" ry="5" fill="none" stroke="#00BFFF" stroke-width="0.7" stroke-opacity="0.5" stroke-dasharray="3 2"/>
+    <g transform="translate(46, 9)"><rect x="-3" y="-2" width="6" height="4" rx="1" fill="#00BFFF" fill-opacity="0.85"/><rect x="-6" y="-1" width="2.5" height="2" rx="0.5" fill="#00BFFF" fill-opacity="0.6"/><rect x="3.5" y="-1" width="2.5" height="2" rx="0.5" fill="#00BFFF" fill-opacity="0.6"/></g>
+    <polygon points="32,17 9,52 32,52" fill="url(#mLc1)" fill-opacity="0.92"/>
+    <polygon points="32,17 55,52 32,52" fill="url(#mRc1)" fill-opacity="0.88"/>
+    <polygon points="32,17 9,52 55,52" fill="none" stroke="#D4A017" stroke-width="1.2" stroke-linejoin="round" filter="url(#gG_ctx1)" stroke-opacity="0.9"/>
+    <circle cx="32" cy="17" r="8" fill="url(#pgc1)"/>
+    <circle cx="32" cy="17" r="5.5" fill="none" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.85" filter="url(#gC_ctx1)"/>
+    <line x1="32" y1="9" x2="32" y2="12.5" stroke="#00BFFF" stroke-width="1" stroke-linecap="round" filter="url(#gC_ctx1)" stroke-opacity="0.9"/>
+    <line x1="32" y1="21.5" x2="32" y2="25" stroke="#00BFFF" stroke-width="1" stroke-linecap="round" filter="url(#gC_ctx1)" stroke-opacity="0.9"/>
+    <line x1="24" y1="17" x2="27" y2="17" stroke="#00BFFF" stroke-width="1" stroke-linecap="round" filter="url(#gC_ctx1)" stroke-opacity="0.9"/>
+    <line x1="37" y1="17" x2="40" y2="17" stroke="#00BFFF" stroke-width="1" stroke-linecap="round" filter="url(#gC_ctx1)" stroke-opacity="0.9"/>
+    <circle cx="32" cy="17" r="1.5" fill="#00BFFF"/>
+    <circle cx="32" cy="17" r="0.8" fill="white" fill-opacity="0.9"/>
+    <rect x="0.5" y="0.5" width="63" height="63" rx="13.5" ry="13.5" fill="none" stroke="#D4A017" stroke-width="0.8" stroke-opacity="0.5"/>
+  </g>
+</svg>
+      <div style="font-size:6.5pt;color:#888;text-align:center;margin-top:2mm;">on dark #0A0A0A</div>
+    </div>
+
+    <div class="context-box ctx-light">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="80" height="80">
+  <defs>
+    <filter id="gG_ctx2" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="0.8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="gC_ctx2" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="mLc2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#D4A017"/><stop offset="100%" stop-color="#8B6A0F"/></linearGradient>
+    <linearGradient id="mRc2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#9B7A10"/><stop offset="100%" stop-color="#4A3A07"/></linearGradient>
+    <radialGradient id="pgc2" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#00BFFF" stop-opacity="0.4"/><stop offset="100%" stop-color="#00BFFF" stop-opacity="0"/></radialGradient>
+    <clipPath id="rrc2"><rect x="0" y="0" width="64" height="64" rx="14" ry="14"/></clipPath>
+  </defs>
+  <g clip-path="url(#rrc2)">
+    <rect width="64" height="64" fill="#0A0A0A"/>
+    <ellipse cx="32" cy="11" rx="16" ry="5" fill="none" stroke="#00BFFF" stroke-width="0.7" stroke-opacity="0.5" stroke-dasharray="3 2"/>
+    <g transform="translate(46, 9)"><rect x="-3" y="-2" width="6" height="4" rx="1" fill="#00BFFF" fill-opacity="0.85"/><rect x="-6" y="-1" width="2.5" height="2" rx="0.5" fill="#00BFFF" fill-opacity="0.6"/><rect x="3.5" y="-1" width="2.5" height="2" rx="0.5" fill="#00BFFF" fill-opacity="0.6"/></g>
+    <polygon points="32,17 9,52 32,52" fill="url(#mLc2)" fill-opacity="0.92"/>
+    <polygon points="32,17 55,52 32,52" fill="url(#mRc2)" fill-opacity="0.88"/>
+    <polygon points="32,17 9,52 55,52" fill="none" stroke="#D4A017" stroke-width="1.2" stroke-linejoin="round" filter="url(#gG_ctx2)" stroke-opacity="0.9"/>
+    <circle cx="32" cy="17" r="8" fill="url(#pgc2)"/>
+    <circle cx="32" cy="17" r="5.5" fill="none" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.85" filter="url(#gC_ctx2)"/>
+    <line x1="32" y1="9" x2="32" y2="12.5" stroke="#00BFFF" stroke-width="1" stroke-linecap="round" stroke-opacity="0.9"/>
+    <line x1="32" y1="21.5" x2="32" y2="25" stroke="#00BFFF" stroke-width="1" stroke-linecap="round" stroke-opacity="0.9"/>
+    <line x1="24" y1="17" x2="27" y2="17" stroke="#00BFFF" stroke-width="1" stroke-linecap="round" stroke-opacity="0.9"/>
+    <line x1="37" y1="17" x2="40" y2="17" stroke="#00BFFF" stroke-width="1" stroke-linecap="round" stroke-opacity="0.9"/>
+    <circle cx="32" cy="17" r="1.5" fill="#00BFFF"/>
+    <circle cx="32" cy="17" r="0.8" fill="white" fill-opacity="0.9"/>
+    <rect x="0.5" y="0.5" width="63" height="63" rx="13.5" ry="13.5" fill="none" stroke="#D4A017" stroke-width="0.8" stroke-opacity="0.5"/>
+  </g>
+</svg>
+      <div style="font-size:6.5pt;color:#888;text-align:center;margin-top:2mm;">on white · keep dark container</div>
+    </div>
+
+    <div class="context-box ctx-gold">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="80" height="80">
+  <defs>
+    <filter id="gG_ctx3" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="0.8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="gC_ctx3" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="mLc3" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#D4A017"/><stop offset="100%" stop-color="#8B6A0F"/></linearGradient>
+    <linearGradient id="mRc3" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#9B7A10"/><stop offset="100%" stop-color="#4A3A07"/></linearGradient>
+    <radialGradient id="pgc3" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#00BFFF" stop-opacity="0.4"/><stop offset="100%" stop-color="#00BFFF" stop-opacity="0"/></radialGradient>
+    <clipPath id="rrc3"><rect x="0" y="0" width="64" height="64" rx="14" ry="14"/></clipPath>
+  </defs>
+  <g clip-path="url(#rrc3)">
+    <rect width="64" height="64" fill="#0A0A0A"/>
+    <polygon points="32,17 9,52 32,52" fill="url(#mLc3)" fill-opacity="0.92"/>
+    <polygon points="32,17 55,52 32,52" fill="url(#mRc3)" fill-opacity="0.88"/>
+    <polygon points="32,17 9,52 55,52" fill="none" stroke="#D4A017" stroke-width="1.2" stroke-linejoin="round" filter="url(#gG_ctx3)" stroke-opacity="0.9"/>
+    <circle cx="32" cy="17" r="5.5" fill="none" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.85" filter="url(#gC_ctx3)"/>
+    <line x1="32" y1="9" x2="32" y2="12.5" stroke="#00BFFF" stroke-width="1" stroke-linecap="round" stroke-opacity="0.9"/>
+    <line x1="32" y1="21.5" x2="32" y2="25" stroke="#00BFFF" stroke-width="1" stroke-linecap="round" stroke-opacity="0.9"/>
+    <line x1="24" y1="17" x2="27" y2="17" stroke="#00BFFF" stroke-width="1" stroke-linecap="round" stroke-opacity="0.9"/>
+    <line x1="37" y1="17" x2="40" y2="17" stroke="#00BFFF" stroke-width="1" stroke-linecap="round" stroke-opacity="0.9"/>
+    <circle cx="32" cy="17" r="1.5" fill="#00BFFF"/>
+    <circle cx="32" cy="17" r="0.8" fill="white" fill-opacity="0.9"/>
+  </g>
+</svg>
+      <div style="font-size:6.5pt;color:#5A3E00;text-align:center;margin-top:2mm;">on gold accent</div>
+    </div>
+  </div>
+
+  <!-- 03 Colour palette -->
+  <div class="section-label" style="color:#444;"><span>03 · COLOR PALETTE</span><span>Brand Colors</span></div>
+  <div class="palette" style="margin-bottom:6mm;">
+    <div class="swatch sw-gold"><span>#D4A017</span><span>Gold · Primary</span></div>
+    <div class="swatch sw-cyan"><span>#00BFFF</span><span>Cyan · Satellite</span></div>
+    <div class="swatch sw-dark"><span>#0A0A0A</span><span>Dark · Background</span></div>
+    <div class="swatch sw-gray"><span>#888888</span><span>Gray · Secondary</span></div>
+    <div class="swatch sw-white"><span>#FFFFFF</span><span>White · Text</span></div>
+  </div>
+
+  <!-- 04 Typography -->
+  <div class="section-label" style="color:#444;"><span>04 · TYPOGRAPHY</span></div>
+  <div style="padding:4mm;background:#F7F7F7;border-radius:6px;margin-bottom:6mm;border:0.3pt solid #E0E0E0;">
+    <div style="font-size:22pt;font-weight:800;color:#111;margin-bottom:2mm;">ProspectorAI</div>
+    <div style="font-size:9pt;color:#666;margin-bottom:1mm;">Wordmark — system-ui / SF Pro Display / Helvetica Neue Bold · Weight 800</div>
+    <div style="font-size:9pt;letter-spacing:1.5pt;color:#888;font-weight:600;margin-bottom:3mm;">MINERAL INTELLIGENCE · SATELLITE GRADE</div>
+    <div style="font-size:7pt;color:#999;letter-spacing:0.5pt;">Tagline — system-ui Regular · Letter-spacing 1.5pt · All caps</div>
+  </div>
+
+  <div class="footer" style="color:#444;">ProspectorAI &nbsp;·&nbsp; Mineral Intelligence &nbsp;·&nbsp; Satellite Grade &nbsp;·&nbsp; assets/branding/</div>
+</div>
+
+</body>
+</html>

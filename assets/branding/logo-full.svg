@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 120" width="480" height="120">
+  <defs>
+    <!-- Gold glow filter -->
+    <filter id="goldGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Cyan glow filter -->
+    <filter id="cyanGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="1.5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Circuit line pattern -->
+    <pattern id="circuitBg" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+      <rect width="20" height="20" fill="none"/>
+      <line x1="0" y1="10" x2="20" y2="10" stroke="#D4A017" stroke-width="0.15" stroke-opacity="0.08"/>
+      <line x1="10" y1="0" x2="10" y2="20" stroke="#D4A017" stroke-width="0.15" stroke-opacity="0.08"/>
+    </pattern>
+    <!-- Gradient for mountain body -->
+    <linearGradient id="mountainGrad" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#D4A017" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#8B6A0F" stop-opacity="0.8"/>
+    </linearGradient>
+    <!-- Gradient for the glow ring -->
+    <radialGradient id="crosshairGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00BFFF" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#00BFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Dark background with gold border -->
+  <rect x="1" y="1" width="478" height="118" rx="8" ry="8" fill="#0A0A0A"/>
+  <rect x="1" y="1" width="478" height="118" rx="8" ry="8" fill="url(#circuitBg)"/>
+  <rect x="1" y="1" width="478" height="118" rx="8" ry="8" fill="none" stroke="#D4A017" stroke-width="1" stroke-opacity="0.6"/>
+
+  <!-- ========================================= -->
+  <!-- ICON AREA (0–90px, centered at y=60)     -->
+  <!-- ========================================= -->
+  <g transform="translate(12, 10)">
+
+    <!-- Radar/scan background glow circle -->
+    <circle cx="40" cy="52" r="32" fill="#00BFFF" fill-opacity="0.04" stroke="#00BFFF" stroke-width="0.5" stroke-opacity="0.2"/>
+    <circle cx="40" cy="52" r="24" fill="none" stroke="#00BFFF" stroke-width="0.4" stroke-opacity="0.15"/>
+
+    <!-- Satellite orbit arc (top) -->
+    <ellipse cx="40" cy="22" rx="18" ry="6" fill="none" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.7" stroke-dasharray="3 2" filter="url(#cyanGlow)"/>
+    <!-- Satellite body -->
+    <g transform="translate(55, 19)" filter="url(#cyanGlow)">
+      <!-- Satellite body -->
+      <rect x="-3" y="-2" width="6" height="4" rx="1" fill="#00BFFF" fill-opacity="0.9"/>
+      <!-- Solar panels -->
+      <rect x="-7" y="-1" width="3" height="2" rx="0.5" fill="#00BFFF" fill-opacity="0.6"/>
+      <rect x="4" y="-1" width="3" height="2" rx="0.5" fill="#00BFFF" fill-opacity="0.6"/>
+    </g>
+
+    <!-- Mountain base pick-axe silhouette (subtle, very dark) -->
+    <!-- Pick-axe blade left -->
+    <path d="M24 85 L28 78 L32 82 Z" fill="#D4A017" fill-opacity="0.25"/>
+    <!-- Pick-axe handle -->
+    <line x1="30" y1="80" x2="42" y2="86" stroke="#D4A017" stroke-width="1" stroke-opacity="0.25" stroke-linecap="round"/>
+    <!-- Pick-axe blade right (spike) -->
+    <path d="M40 84 L44 79 L46 84 Z" fill="#D4A017" fill-opacity="0.2"/>
+
+    <!-- MOUNTAIN: Circuit board styled -->
+    <!-- Left face of mountain -->
+    <path d="M40 25 L14 78 L40 78 Z" fill="url(#mountainGrad)" fill-opacity="0.85"/>
+    <!-- Right face of mountain (slightly darker) -->
+    <path d="M40 25 L66 78 L40 78 Z" fill="#8B6A0F" fill-opacity="0.75"/>
+    <!-- Mountain center line (ridge) -->
+    <line x1="40" y1="25" x2="40" y2="78" stroke="#D4A017" stroke-width="0.6" stroke-opacity="0.4"/>
+
+    <!-- Circuit board lines on left face -->
+    <g stroke="#D4A017" stroke-opacity="0.55" stroke-width="0.8" fill="none" stroke-linecap="round">
+      <!-- Horizontal circuit traces (left face) -->
+      <line x1="27" y1="55" x2="36" y2="55"/>
+      <line x1="22" y1="65" x2="36" y2="65"/>
+      <line x1="25" y1="72" x2="36" y2="72"/>
+      <!-- Vertical connections -->
+      <line x1="30" y1="55" x2="30" y2="65"/>
+      <line x1="35" y1="65" x2="35" y2="72"/>
+      <!-- Circuit nodes -->
+      <circle cx="30" cy="55" r="1.2" fill="#D4A017" fill-opacity="0.7" stroke="none"/>
+      <circle cx="35" cy="65" r="1.2" fill="#D4A017" fill-opacity="0.7" stroke="none"/>
+      <circle cx="27" cy="72" r="1" fill="#D4A017" fill-opacity="0.7" stroke="none"/>
+    </g>
+
+    <!-- Circuit board lines on right face -->
+    <g stroke="#8B6A0F" stroke-opacity="0.6" stroke-width="0.8" fill="none" stroke-linecap="round">
+      <line x1="44" y1="55" x2="53" y2="55"/>
+      <line x1="44" y1="65" x2="57" y2="65"/>
+      <line x1="44" y1="72" x2="54" y2="72"/>
+      <line x1="50" y1="55" x2="50" y2="65"/>
+      <line x1="45" y1="65" x2="45" y2="72"/>
+      <circle cx="50" cy="55" r="1.2" fill="#8B6A0F" fill-opacity="0.8" stroke="none"/>
+      <circle cx="45" cy="65" r="1.2" fill="#8B6A0F" fill-opacity="0.8" stroke="none"/>
+      <circle cx="54" cy="72" r="1" fill="#8B6A0F" fill-opacity="0.8" stroke="none"/>
+    </g>
+
+    <!-- Mountain outline glow -->
+    <path d="M40 25 L14 78 L66 78 Z" fill="none" stroke="#D4A017" stroke-width="1.2" stroke-linejoin="round" filter="url(#goldGlow)" stroke-opacity="0.9"/>
+
+    <!-- GPS Crosshair at peak -->
+    <!-- Outer glow -->
+    <circle cx="40" cy="25" r="9" fill="url(#crosshairGlow)"/>
+    <!-- Crosshair rings -->
+    <circle cx="40" cy="25" r="7" fill="none" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.8" filter="url(#cyanGlow)"/>
+    <circle cx="40" cy="25" r="4" fill="none" stroke="#00BFFF" stroke-width="0.8" stroke-opacity="0.9"/>
+    <!-- Crosshair lines -->
+    <line x1="40" y1="16" x2="40" y2="20" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.9" stroke-linecap="round" filter="url(#cyanGlow)"/>
+    <line x1="40" y1="30" x2="40" y2="34" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.9" stroke-linecap="round" filter="url(#cyanGlow)"/>
+    <line x1="31" y1="25" x2="35" y2="25" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.9" stroke-linecap="round" filter="url(#cyanGlow)"/>
+    <line x1="45" y1="25" x2="49" y2="25" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.9" stroke-linecap="round" filter="url(#cyanGlow)"/>
+    <!-- Center dot -->
+    <circle cx="40" cy="25" r="1.8" fill="#00BFFF" filter="url(#cyanGlow)"/>
+
+  </g>
+
+  <!-- Vertical separator line -->
+  <line x1="96" y1="20" x2="96" y2="100" stroke="#D4A017" stroke-width="0.5" stroke-opacity="0.4"/>
+
+  <!-- ========================================= -->
+  <!-- TEXT AREA                                 -->
+  <!-- ========================================= -->
+  <g transform="translate(108, 0)">
+    <!-- Main wordmark: "Prospector" white + "AI" gold -->
+    <text y="62" font-family="system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="38" letter-spacing="-0.5" fill="#FFFFFF">Prospector</text>
+    <text x="253" y="62" font-family="system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="38" letter-spacing="-0.5" fill="#D4A017" filter="url(#goldGlow)">AI</text>
+
+    <!-- Tagline -->
+    <text y="82" font-family="system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="400" font-size="11" letter-spacing="1.5" fill="#888888">MINERAL INTELLIGENCE · SATELLITE GRADE</text>
+  </g>
+</svg>

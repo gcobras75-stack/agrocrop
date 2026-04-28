@@ -1,0 +1,310 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- Gold glow -->
+    <filter id="goldGlow" x="-15%" y="-15%" width="130%" height="130%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Strong gold glow for peak -->
+    <filter id="goldGlowStrong" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Cyan glow -->
+    <filter id="cyanGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Cyan soft glow -->
+    <filter id="cyanGlowSoft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="20" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Mountain gradient -->
+    <linearGradient id="mountainLeft" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#D4A017"/>
+      <stop offset="60%" stop-color="#B8860B"/>
+      <stop offset="100%" stop-color="#7A5C0A"/>
+    </linearGradient>
+    <linearGradient id="mountainRight" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#8B6A0F"/>
+      <stop offset="100%" stop-color="#4A3A07"/>
+    </linearGradient>
+    <!-- Background radial -->
+    <radialGradient id="bgGrad" cx="50%" cy="45%" r="60%">
+      <stop offset="0%" stop-color="#141414"/>
+      <stop offset="100%" stop-color="#0A0A0A"/>
+    </radialGradient>
+    <!-- Crosshair center glow -->
+    <radialGradient id="peakGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00BFFF" stop-opacity="0.5"/>
+      <stop offset="40%" stop-color="#00BFFF" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#00BFFF" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Orbit gradient -->
+    <linearGradient id="orbitGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#00BFFF" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#00BFFF" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#00BFFF" stop-opacity="0.2"/>
+    </linearGradient>
+    <!-- Scan ring gradient -->
+    <radialGradient id="scanRingGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="80%" stop-color="#00BFFF" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#00BFFF" stop-opacity="0.12"/>
+    </radialGradient>
+    <!-- Circuit grid pattern -->
+    <pattern id="circuitGrid" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+      <rect width="40" height="40" fill="none"/>
+      <line x1="0" y1="20" x2="40" y2="20" stroke="#D4A017" stroke-width="0.3" stroke-opacity="0.07"/>
+      <line x1="20" y1="0" x2="20" y2="40" stroke="#D4A017" stroke-width="0.3" stroke-opacity="0.07"/>
+    </pattern>
+    <clipPath id="roundedSquare">
+      <rect x="0" y="0" width="1024" height="1024" rx="220" ry="220"/>
+    </clipPath>
+  </defs>
+
+  <!-- Rounded square clip -->
+  <g clip-path="url(#roundedSquare)">
+
+    <!-- Background -->
+    <rect width="1024" height="1024" fill="#0A0A0A"/>
+    <rect width="1024" height="1024" fill="url(#bgGrad)"/>
+    <rect width="1024" height="1024" fill="url(#circuitGrid)"/>
+
+    <!-- Outer scan rings (atmospheric) -->
+    <circle cx="512" cy="520" r="400" fill="none" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.06"/>
+    <circle cx="512" cy="520" r="340" fill="none" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.08"/>
+    <circle cx="512" cy="520" r="280" fill="none" stroke="#D4A017" stroke-width="0.5" stroke-opacity="0.07"/>
+
+    <!-- Satellite orbit ellipse (top arc) -->
+    <ellipse cx="512" cy="210" rx="260" ry="65" fill="none" stroke="url(#orbitGrad)" stroke-width="1.5" stroke-dasharray="12 8" filter="url(#cyanGlow)" stroke-opacity="0.7"/>
+
+    <!-- Satellite body -->
+    <g transform="translate(740, 185)" filter="url(#cyanGlow)">
+      <!-- Main body -->
+      <rect x="-18" y="-10" width="36" height="20" rx="4" fill="#00BFFF" fill-opacity="0.85"/>
+      <!-- Solar panel left -->
+      <rect x="-46" y="-6" width="24" height="12" rx="3" fill="#0080AA" fill-opacity="0.9"/>
+      <!-- Panel separator left -->
+      <line x1="-34" y1="-6" x2="-34" y2="6" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.5"/>
+      <line x1="-40" y1="-6" x2="-40" y2="6" stroke="#00BFFF" stroke-width="0.5" stroke-opacity="0.4"/>
+      <!-- Solar panel right -->
+      <rect x="22" y="-6" width="24" height="12" rx="3" fill="#0080AA" fill-opacity="0.9"/>
+      <line x1="34" y1="-6" x2="34" y2="6" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.5"/>
+      <line x1="40" y1="-6" x2="40" y2="6" stroke="#00BFFF" stroke-width="0.5" stroke-opacity="0.4"/>
+      <!-- Antenna -->
+      <line x1="0" y1="-10" x2="0" y2="-22" stroke="#00BFFF" stroke-width="1.5" stroke-opacity="0.9"/>
+      <circle cx="0" cy="-24" r="3" fill="#00BFFF"/>
+      <!-- Signal dot -->
+      <circle cx="0" cy="0" r="3" fill="white" fill-opacity="0.6"/>
+    </g>
+
+    <!-- Signal beam from satellite to mountain peak -->
+    <line x1="740" y1="200" x2="512" y2="305" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.15" stroke-dasharray="8 6"/>
+
+    <!-- ============================================ -->
+    <!-- MOUNTAIN                                     -->
+    <!-- Peak at (512, 295), base at y=760           -->
+    <!-- Left base: (160, 760), Right base: (864, 760)-->
+    <!-- ============================================ -->
+
+    <!-- Mountain shadow/base glow -->
+    <ellipse cx="512" cy="755" rx="300" ry="20" fill="#D4A017" fill-opacity="0.08"/>
+
+    <!-- Left face -->
+    <polygon points="512,295 160,760 512,760" fill="url(#mountainLeft)" fill-opacity="0.9"/>
+    <!-- Right face -->
+    <polygon points="512,295 864,760 512,760" fill="url(#mountainRight)" fill-opacity="0.88"/>
+
+    <!-- Mountain face - secondary peak/ridge detail (left shoulder) -->
+    <polygon points="512,295 280,540 160,760 320,760" fill="#0A0A0A" fill-opacity="0.15"/>
+    <!-- Mountain face - secondary ridge (right shoulder) -->
+    <polygon points="512,295 740,540 864,760 700,760" fill="#0A0A0A" fill-opacity="0.1"/>
+
+    <!-- Snow cap effect at peak -->
+    <polygon points="512,295 470,360 554,360" fill="white" fill-opacity="0.07"/>
+
+    <!-- ============================================ -->
+    <!-- CIRCUIT BOARD TRACES ON MOUNTAIN FACES      -->
+    <!-- ============================================ -->
+
+    <!-- LEFT FACE circuit traces -->
+    <g stroke="#D4A017" stroke-opacity="0.5" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <!-- Horizontal bus lines (left face) -->
+      <line x1="310" y1="460" x2="492" y2="460"/>
+      <line x1="260" y1="530" x2="492" y2="530"/>
+      <line x1="210" y1="600" x2="492" y2="600"/>
+      <line x1="185" y1="660" x2="492" y2="660"/>
+      <line x1="175" y1="710" x2="492" y2="710"/>
+      <!-- Vertical connections -->
+      <line x1="380" y1="460" x2="380" y2="530"/>
+      <line x1="320" y1="530" x2="320" y2="600"/>
+      <line x1="430" y1="530" x2="430" y2="600"/>
+      <line x1="260" y1="600" x2="260" y2="660"/>
+      <line x1="380" y1="600" x2="380" y2="660"/>
+      <line x1="460" y1="600" x2="460" y2="660"/>
+      <line x1="220" y1="660" x2="220" y2="710"/>
+      <line x1="340" y1="660" x2="340" y2="710"/>
+      <line x1="440" y1="660" x2="440" y2="710"/>
+      <!-- Short stub traces -->
+      <line x1="350" y1="460" x2="350" y2="490"/>
+      <line x1="450" y1="460" x2="450" y2="480"/>
+    </g>
+
+    <!-- LEFT FACE circuit nodes -->
+    <g fill="#D4A017" fill-opacity="0.75" stroke="none">
+      <circle cx="380" cy="460" r="4"/>
+      <circle cx="320" cy="530" r="4"/>
+      <circle cx="430" cy="530" r="4"/>
+      <circle cx="260" cy="600" r="4"/>
+      <circle cx="380" cy="600" r="4"/>
+      <circle cx="460" cy="600" r="4"/>
+      <circle cx="220" cy="660" r="3.5"/>
+      <circle cx="340" cy="660" r="3.5"/>
+      <circle cx="440" cy="660" r="3.5"/>
+      <circle cx="350" cy="460" r="3"/>
+      <circle cx="450" cy="460" r="3"/>
+    </g>
+
+    <!-- Small component pads (left face) -->
+    <g fill="none" stroke="#D4A017" stroke-width="1.5" stroke-opacity="0.45">
+      <rect x="370" y="454" width="20" height="12" rx="2"/>
+      <rect x="418" y="522" width="24" height="16" rx="2"/>
+      <rect x="310" y="592" width="20" height="16" rx="2"/>
+    </g>
+
+    <!-- RIGHT FACE circuit traces -->
+    <g stroke="#B8860B" stroke-opacity="0.45" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="532" y1="460" x2="700" y2="460"/>
+      <line x1="532" y1="530" x2="750" y2="530"/>
+      <line x1="532" y1="600" x2="800" y2="600"/>
+      <line x1="532" y1="660" x2="830" y2="660"/>
+      <line x1="532" y1="710" x2="840" y2="710"/>
+      <line x1="620" y1="460" x2="620" y2="530"/>
+      <line x1="680" y1="460" x2="680" y2="530"/>
+      <line x1="570" y1="530" x2="570" y2="600"/>
+      <line x1="660" y1="530" x2="660" y2="600"/>
+      <line x1="730" y1="530" x2="730" y2="600"/>
+      <line x1="600" y1="600" x2="600" y2="660"/>
+      <line x1="700" y1="600" x2="700" y2="660"/>
+      <line x1="780" y1="600" x2="780" y2="660"/>
+      <line x1="560" y1="660" x2="560" y2="710"/>
+      <line x1="680" y1="660" x2="680" y2="710"/>
+      <line x1="790" y1="660" x2="790" y2="710"/>
+    </g>
+
+    <!-- RIGHT FACE circuit nodes -->
+    <g fill="#B8860B" fill-opacity="0.7" stroke="none">
+      <circle cx="620" cy="460" r="4"/>
+      <circle cx="680" cy="460" r="4"/>
+      <circle cx="570" cy="530" r="4"/>
+      <circle cx="660" cy="530" r="4"/>
+      <circle cx="730" cy="530" r="4"/>
+      <circle cx="600" cy="600" r="4"/>
+      <circle cx="700" cy="600" r="4"/>
+      <circle cx="780" cy="600" r="4"/>
+      <circle cx="560" cy="660" r="3.5"/>
+      <circle cx="680" cy="660" r="3.5"/>
+      <circle cx="790" cy="660" r="3.5"/>
+    </g>
+
+    <!-- Small component pads (right face) -->
+    <g fill="none" stroke="#B8860B" stroke-width="1.5" stroke-opacity="0.4">
+      <rect x="608" y="452" width="24" height="16" rx="2"/>
+      <rect x="648" y="522" width="24" height="16" rx="2"/>
+      <rect x="690" y="592" width="20" height="16" rx="2"/>
+    </g>
+
+    <!-- Mountain ridge (center line) -->
+    <line x1="512" y1="295" x2="512" y2="760" stroke="#D4A017" stroke-width="1.5" stroke-opacity="0.2"/>
+
+    <!-- Mountain outline with gold glow -->
+    <polygon points="512,295 160,760 864,760" fill="none" stroke="#D4A017" stroke-width="2.5" stroke-linejoin="round" filter="url(#goldGlow)" stroke-opacity="0.95"/>
+
+    <!-- ============================================ -->
+    <!-- PICK-AXE silhouette at mountain base        -->
+    <!-- ============================================ -->
+    <g transform="translate(512, 755)" fill="#D4A017" fill-opacity="0.22" stroke="none">
+      <!-- Axe head left (cutting blade) -->
+      <path d="M-80 0 C-100 -25, -90 -45, -65 -40 L-50 -10 Z"/>
+      <!-- Axe head right (spike/pick) -->
+      <path d="M50 0 C80 -20, 85 -38, 68 -38 L45 -10 Z"/>
+      <!-- Handle -->
+      <rect x="-8" y="-60" width="16" height="65" rx="5" transform="rotate(-5)"/>
+    </g>
+
+    <!-- ============================================ -->
+    <!-- GPS CROSSHAIR AT PEAK                       -->
+    <!-- ============================================ -->
+
+    <!-- Crosshair ambient glow area -->
+    <circle cx="512" cy="305" r="80" fill="url(#peakGlow)"/>
+
+    <!-- Scan pulse rings (animated feel via varying opacity) -->
+    <circle cx="512" cy="305" r="55" fill="none" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.2"/>
+    <circle cx="512" cy="305" r="40" fill="none" stroke="#00BFFF" stroke-width="1.2" stroke-opacity="0.3"/>
+
+    <!-- Crosshair outer ring -->
+    <circle cx="512" cy="305" r="28" fill="none" stroke="#00BFFF" stroke-width="2.5" stroke-opacity="0.9" filter="url(#cyanGlow)"/>
+
+    <!-- Inner ring -->
+    <circle cx="512" cy="305" r="16" fill="none" stroke="#00BFFF" stroke-width="2" stroke-opacity="0.95" filter="url(#cyanGlow)"/>
+
+    <!-- Crosshair arms (4 directions, with gaps at rings) -->
+    <!-- Top arm -->
+    <line x1="512" y1="258" x2="512" y2="276" stroke="#00BFFF" stroke-width="2.5" stroke-linecap="round" filter="url(#cyanGlow)" stroke-opacity="0.95"/>
+    <!-- Bottom arm -->
+    <line x1="512" y1="334" x2="512" y2="352" stroke="#00BFFF" stroke-width="2.5" stroke-linecap="round" filter="url(#cyanGlow)" stroke-opacity="0.95"/>
+    <!-- Left arm -->
+    <line x1="462" y1="305" x2="480" y2="305" stroke="#00BFFF" stroke-width="2.5" stroke-linecap="round" filter="url(#cyanGlow)" stroke-opacity="0.95"/>
+    <!-- Right arm -->
+    <line x1="544" y1="305" x2="562" y2="305" stroke="#00BFFF" stroke-width="2.5" stroke-linecap="round" filter="url(#cyanGlow)" stroke-opacity="0.95"/>
+
+    <!-- Inner crosshair ticks -->
+    <line x1="512" y1="289" x2="512" y2="295" stroke="#00BFFF" stroke-width="1.5" stroke-linecap="round" stroke-opacity="0.8"/>
+    <line x1="512" y1="315" x2="512" y2="321" stroke="#00BFFF" stroke-width="1.5" stroke-linecap="round" stroke-opacity="0.8"/>
+    <line x1="496" y1="305" x2="502" y2="305" stroke="#00BFFF" stroke-width="1.5" stroke-linecap="round" stroke-opacity="0.8"/>
+    <line x1="522" y1="305" x2="528" y2="305" stroke="#00BFFF" stroke-width="1.5" stroke-linecap="round" stroke-opacity="0.8"/>
+
+    <!-- Center dot -->
+    <circle cx="512" cy="305" r="5" fill="#00BFFF" filter="url(#cyanGlowSoft)"/>
+    <circle cx="512" cy="305" r="3" fill="white" fill-opacity="0.9"/>
+
+    <!-- ============================================ -->
+    <!-- "AI" label in corner                        -->
+    <!-- ============================================ -->
+    <g transform="translate(790, 790)">
+      <!-- Background pill -->
+      <rect x="-10" y="-34" width="80" height="44" rx="10" fill="#D4A017" fill-opacity="0.15" stroke="#D4A017" stroke-width="1.5" stroke-opacity="0.5"/>
+      <text x="30" y="0" text-anchor="middle" font-family="system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="36" fill="#D4A017" filter="url(#goldGlow)">AI</text>
+    </g>
+
+    <!-- Corner scan marks (radar corners) -->
+    <g stroke="#00BFFF" stroke-width="2" stroke-opacity="0.25" fill="none" stroke-linecap="round">
+      <!-- Top-left -->
+      <polyline points="80,140 80,80 140,80"/>
+      <!-- Top-right -->
+      <polyline points="884,140 884,80 824,80"/>
+      <!-- Bottom-left -->
+      <polyline points="80,884 80,944 140,944"/>
+      <!-- Bottom-right -->
+      <polyline points="884,884 884,944 824,944"/>
+    </g>
+
+    <!-- Border glow -->
+    <rect x="2" y="2" width="1020" height="1020" rx="218" ry="218" fill="none" stroke="#D4A017" stroke-width="2" stroke-opacity="0.35"/>
+
+  </g>
+</svg>

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 2048px;
+    height: 2048px;
+    overflow: hidden;
+    background: #0A0A0A;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 60px;
+  }
+  .icon-wrap svg { display: block; }
+  .logo-wrap svg { display: block; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Icon 400×400 -->
+  <div class="icon-wrap">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="400" height="400">
+  <defs>
+    <filter id="gGold_sp" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="0.8" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="gCyan_sp" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="1" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="mL64_sp" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#D4A017"/>
+      <stop offset="100%" stop-color="#8B6A0F"/>
+    </linearGradient>
+    <linearGradient id="mR64_sp" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#9B7A10"/>
+      <stop offset="100%" stop-color="#4A3A07"/>
+    </linearGradient>
+    <radialGradient id="peakGlowSm_sp" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00BFFF" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#00BFFF" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="rr64_sp">
+      <rect x="0" y="0" width="64" height="64" rx="14" ry="14"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#rr64_sp)">
+    <rect width="64" height="64" fill="#111111"/>
+    <ellipse cx="32" cy="11" rx="16" ry="5" fill="none" stroke="#00BFFF" stroke-width="0.7" stroke-opacity="0.5" stroke-dasharray="3 2"/>
+    <g transform="translate(46, 9)">
+      <rect x="-3" y="-2" width="6" height="4" rx="1" fill="#00BFFF" fill-opacity="0.85"/>
+      <rect x="-6" y="-1" width="2.5" height="2" rx="0.5" fill="#00BFFF" fill-opacity="0.6"/>
+      <rect x="3.5" y="-1" width="2.5" height="2" rx="0.5" fill="#00BFFF" fill-opacity="0.6"/>
+    </g>
+    <polygon points="32,17 9,52 32,52" fill="url(#mL64_sp)" fill-opacity="0.92"/>
+    <polygon points="32,17 55,52 32,52" fill="url(#mR64_sp)" fill-opacity="0.88"/>
+    <line x1="32" y1="17" x2="32" y2="52" stroke="#D4A017" stroke-width="0.5" stroke-opacity="0.25"/>
+    <g stroke="#D4A017" stroke-opacity="0.55" stroke-width="0.8" fill="none" stroke-linecap="round">
+      <line x1="18" y1="33" x2="31" y2="33"/>
+      <line x1="13" y1="42" x2="31" y2="42"/>
+      <line x1="11" y1="49" x2="31" y2="49"/>
+      <line x1="22" y1="33" x2="22" y2="42"/>
+      <line x1="28" y1="42" x2="28" y2="49"/>
+      <circle cx="22" cy="33" r="1" fill="#D4A017" stroke="none"/>
+      <circle cx="28" cy="42" r="1" fill="#D4A017" stroke="none"/>
+    </g>
+    <g stroke="#8B6A0F" stroke-opacity="0.55" stroke-width="0.8" fill="none" stroke-linecap="round">
+      <line x1="33" y1="33" x2="46" y2="33"/>
+      <line x1="33" y1="42" x2="51" y2="42"/>
+      <line x1="33" y1="49" x2="53" y2="49"/>
+      <line x1="42" y1="33" x2="42" y2="42"/>
+      <line x1="36" y1="42" x2="36" y2="49"/>
+      <circle cx="42" cy="33" r="1" fill="#8B6A0F" stroke="none"/>
+      <circle cx="36" cy="42" r="1" fill="#8B6A0F" stroke="none"/>
+    </g>
+    <polygon points="32,17 9,52 55,52" fill="none" stroke="#D4A017" stroke-width="1.2" stroke-linejoin="round" filter="url(#gGold_sp)" stroke-opacity="0.9"/>
+    <circle cx="32" cy="17" r="8" fill="url(#peakGlowSm_sp)"/>
+    <circle cx="32" cy="17" r="5.5" fill="none" stroke="#00BFFF" stroke-width="1" stroke-opacity="0.85" filter="url(#gCyan_sp)"/>
+    <circle cx="32" cy="17" r="3" fill="none" stroke="#00BFFF" stroke-width="0.8" stroke-opacity="0.9"/>
+    <line x1="32" y1="9"  x2="32" y2="12.5" stroke="#00BFFF" stroke-width="1" stroke-linecap="round" filter="url(#gCyan_sp)" stroke-opacity="0.9"/>
+    <line x1="32" y1="21.5" x2="32" y2="25" stroke="#00BFFF" stroke-width="1" stroke-linecap="round" filter="url(#gCyan_sp)" stroke-opacity="0.9"/>
+    <line x1="24" y1="17" x2="27" y2="17" stroke="#00BFFF" stroke-width="1" stroke-linecap="round" filter="url(#gCyan_sp)" stroke-opacity="0.9"/>
+    <line x1="37" y1="17" x2="40" y2="17" stroke="#00BFFF" stroke-width="1" stroke-linecap="round" filter="url(#gCyan_sp)" stroke-opacity="0.9"/>
+    <circle cx="32" cy="17" r="1.5" fill="#00BFFF"/>
+    <circle cx="32" cy="17" r="0.8" fill="white" fill-opacity="0.9"/>
+    <rect x="0.5" y="0.5" width="63" height="63" rx="13.5" ry="13.5" fill="none" stroke="#D4A017" stroke-width="0.8" stroke-opacity="0.4"/>
+  </g>
+</svg>
+  </div>
+
+  <!-- Wordmark below -->
+  <div class="logo-wrap">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 80" width="800" height="160">
+      <defs>
+        <filter id="gGold_txt" x="-10%" y="-20%" width="120%" height="140%">
+          <feGaussianBlur stdDeviation="3" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <text x="0" y="58"
+        font-family="system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif"
+        font-weight="800" font-size="64" letter-spacing="-1"
+        fill="#FFFFFF">Prospector</text>
+      <text x="340" y="58"
+        font-family="system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif"
+        font-weight="800" font-size="64" letter-spacing="-1"
+        fill="#D4A017" filter="url(#gGold_txt)">AI</text>
+      <text x="200" y="76"
+        text-anchor="middle"
+        font-family="system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif"
+        font-weight="400" font-size="13" letter-spacing="3"
+        fill="#666666">MINERAL INTELLIGENCE · SATELLITE GRADE</text>
+    </svg>
+  </div>
+
+</div>
+</body>
+</html>

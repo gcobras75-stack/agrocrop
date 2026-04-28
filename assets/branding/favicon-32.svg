@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <filter id="g1" x="-25%" y="-25%" width="150%" height="150%">
+      <feGaussianBlur stdDeviation="0.6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="mL32" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#D4A017"/>
+      <stop offset="100%" stop-color="#8B6A0F"/>
+    </linearGradient>
+    <linearGradient id="mR32" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#9B7A10"/>
+      <stop offset="100%" stop-color="#4A3A07"/>
+    </linearGradient>
+    <clipPath id="rr32">
+      <rect x="0" y="0" width="32" height="32" rx="7" ry="7"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#rr32)">
+    <!-- Background -->
+    <rect width="32" height="32" fill="#0A0A0A"/>
+
+    <!-- Mountain left face -->
+    <polygon points="16,7 3,27 16,27" fill="url(#mL32)" fill-opacity="0.95"/>
+    <!-- Mountain right face -->
+    <polygon points="16,7 29,27 16,27" fill="url(#mR32)" fill-opacity="0.9"/>
+
+    <!-- Single subtle circuit line each side -->
+    <line x1="9" y1="19" x2="15" y2="19" stroke="#D4A017" stroke-width="0.7" stroke-opacity="0.55"/>
+    <line x1="17" y1="19" x2="23" y2="19" stroke="#B8860B" stroke-width="0.7" stroke-opacity="0.5"/>
+    <circle cx="12" cy="19" r="0.8" fill="#D4A017" fill-opacity="0.7"/>
+    <circle cx="20" cy="19" r="0.8" fill="#B8860B" fill-opacity="0.7"/>
+
+    <!-- Mountain outline -->
+    <polygon points="16,7 3,27 29,27" fill="none" stroke="#D4A017" stroke-width="1.1" stroke-linejoin="round" filter="url(#g1)" stroke-opacity="0.95"/>
+
+    <!-- Crosshair outer ring at peak -->
+    <circle cx="16" cy="7" r="4" fill="none" stroke="#00BFFF" stroke-width="0.9" stroke-opacity="0.9" filter="url(#g1)"/>
+
+    <!-- Crosshair arms (compact, 4-directional) -->
+    <line x1="16" y1="1"  x2="16" y2="4.2" stroke="#00BFFF" stroke-width="0.9" stroke-linecap="round" filter="url(#g1)"/>
+    <line x1="16" y1="9.8" x2="16" y2="13" stroke="#00BFFF" stroke-width="0.9" stroke-linecap="round" filter="url(#g1)"/>
+    <line x1="10" y1="7"  x2="13.2" y2="7" stroke="#00BFFF" stroke-width="0.9" stroke-linecap="round" filter="url(#g1)"/>
+    <line x1="18.8" y1="7" x2="22" y2="7" stroke="#00BFFF" stroke-width="0.9" stroke-linecap="round" filter="url(#g1)"/>
+
+    <!-- Center peak dot -->
+    <circle cx="16" cy="7" r="1.4" fill="#00BFFF" filter="url(#g1)"/>
+    <circle cx="16" cy="7" r="0.7" fill="white" fill-opacity="0.95"/>
+
+    <!-- Border -->
+    <rect x="0.5" y="0.5" width="31" height="31" rx="6.5" ry="6.5" fill="none" stroke="#D4A017" stroke-width="0.7" stroke-opacity="0.5"/>
+  </g>
+</svg>
