@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator, Platform, TouchableOpacity, Alert, Modal, TextInput, ScrollView, Switch, Share, Animated, Dimensions, Linking } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
-import MapView, { Marker, Polygon, Polyline, Circle, Region, MapPressEvent } from 'react-native-maps';
+import MapView, { Marker, Polygon, Polyline, Region, MapPressEvent } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -392,7 +392,7 @@ ${(cropData as any).proyeccion ? `
 ━━━━━━━━━━━━━━━━━
 ${mangoSection}
 
-🤖 _Generado con AgroCrop v3.0_
+🤖 _Generado con AgroCrop v3.1_
 _Datos: ESA Copernicus, NASA, USGS_`;
 
       await Share.share({
@@ -674,22 +674,27 @@ _Datos: ESA Copernicus, NASA, USGS_`;
   // ── Heatmap grid polygon data (memoized) ────────────────────────────────
   const cropGridPolygons = useMemo(() => {
     if (!cropGridCells.length) return [];
-    // Calculate halfDeg from actual cell size in meters (with minimum visibility)
     const halfDeg = Math.max((cropCellSizeM / 1000) / 111.32 / 2, 0.00005);
-    console.log('[AgroCrop] Renderizando', cropGridCells.length, 'celdas, celda:', cropCellSizeM, 'm, halfDeg:', halfDeg.toFixed(5));
-    return cropGridCells.map((cell, i) => ({
-      key: `hm-${i}`,
-      coords: [
-        { latitude: cell.lat - halfDeg, longitude: cell.lng - halfDeg },
-        { latitude: cell.lat - halfDeg, longitude: cell.lng + halfDeg },
-        { latitude: cell.lat + halfDeg, longitude: cell.lng + halfDeg },
-        { latitude: cell.lat + halfDeg, longitude: cell.lng - halfDeg },
-      ],
-      fill: cell.color_hex + 'A6',
-      label: cell.rendimiento_ton_ha.toFixed(1),
-      lat: cell.lat,
-      lng: cell.lng,
-    }));
+    console.log('[AgroCrop] Renderizando', cropGridCells.length, 'celdas, celda:', cropCellSizeM, 'm');
+    return cropGridCells.map((cell: any, i: number) => {
+      // Use exact bounds from server if available, otherwise calculate from halfDeg
+      const coords = cell.bounds && cell.bounds.length >= 4
+        ? cell.bounds.map((b: any) => ({ latitude: b.lat, longitude: b.lng }))
+        : [
+            { latitude: cell.lat - halfDeg, longitude: cell.lng - halfDeg },
+            { latitude: cell.lat - halfDeg, longitude: cell.lng + halfDeg },
+            { latitude: cell.lat + halfDeg, longitude: cell.lng + halfDeg },
+            { latitude: cell.lat + halfDeg, longitude: cell.lng - halfDeg },
+          ];
+      return {
+        key: `hm-${i}`,
+        coords,
+        fill: cell.color_hex + 'BB',
+        label: cell.rendimiento_ton_ha.toFixed(1),
+        lat: cell.lat,
+        lng: cell.lng,
+      };
+    });
   }, [cropGridCells, cropCellSizeM]);
 
   // Stable viewport ref — avoids re-renders during pan/zoom
@@ -1002,18 +1007,8 @@ _Datos: ESA Copernicus, NASA, USGS_`;
             </Marker>
           ))}
 
-          {/* AgroCrop heatmap — Circles for small pixels, Polygons for large */}
-          {showCropHeatmap && cropCellSizeM <= 30 && visibleGridPolygons.map(p => (
-            <Circle
-              key={p.key}
-              center={{ latitude: p.lat, longitude: p.lng }}
-              radius={cropCellSizeM / 2}
-              fillColor={p.fill}
-              strokeColor="transparent"
-              strokeWidth={0}
-            />
-          ))}
-          {showCropHeatmap && cropCellSizeM > 30 && visibleGridPolygons.map(p => (
+          {/* AgroCrop heatmap grid */}
+          {showCropHeatmap && visibleGridPolygons.map(p => (
             <Polygon
               key={p.key}
               coordinates={p.coords}
@@ -1068,7 +1063,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
 
         {/* VERSION TAG */}
         <View style={styles.versionTag}>
-          <Text style={styles.versionTagText}>AgroCrop v3.0</Text>
+          <Text style={styles.versionTagText}>AgroCrop v3.1</Text>
         </View>
 
         {/* FLOATING MAP CONTROLS (RIGHT) */}
