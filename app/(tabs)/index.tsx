@@ -392,7 +392,7 @@ ${(cropData as any).proyeccion ? `
 ━━━━━━━━━━━━━━━━━
 ${mangoSection}
 
-🤖 _Generado con AgroCrop v2.8_
+🤖 _Generado con AgroCrop v2.9_
 _Datos: ESA Copernicus, NASA, USGS_`;
 
       await Share.share({
@@ -1058,7 +1058,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
 
         {/* VERSION TAG */}
         <View style={styles.versionTag}>
-          <Text style={styles.versionTagText}>AgroCrop v2.8</Text>
+          <Text style={styles.versionTagText}>AgroCrop v2.9</Text>
         </View>
 
         {/* FLOATING MAP CONTROLS (RIGHT) */}
@@ -1155,7 +1155,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.bottomBtnSecondary}
-          onPress={() => { cargarParcelas(); setShowParcelasModal(true); }}
+          onPress={async () => { await cargarParcelas(); setShowParcelasModal(true); }}
         >
           <Text style={styles.bottomBtnSecondaryText}>📂 MIS PARCELAS</Text>
         </TouchableOpacity>
