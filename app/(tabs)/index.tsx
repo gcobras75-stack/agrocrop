@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator, Platform, TouchableOpacity, Alert, Modal, TextInput, ScrollView, Switch, Share, Animated, Dimensions, Linking } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
-import MapView, { Marker, Polygon, Polyline, Region, MapPressEvent } from 'react-native-maps';
+import MapView, { Marker, Polygon, Polyline, Circle, Region, MapPressEvent } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -392,7 +392,7 @@ ${(cropData as any).proyeccion ? `
 ━━━━━━━━━━━━━━━━━
 ${mangoSection}
 
-🤖 _Generado con AgroCrop v2.9_
+🤖 _Generado con AgroCrop v3.0_
 _Datos: ESA Copernicus, NASA, USGS_`;
 
       await Share.share({
@@ -1002,8 +1002,18 @@ _Datos: ESA Copernicus, NASA, USGS_`;
             </Marker>
           ))}
 
-          {/* AgroCrop heatmap grid */}
-          {showCropHeatmap && visibleGridPolygons.map(p => (
+          {/* AgroCrop heatmap — Circles for small pixels, Polygons for large */}
+          {showCropHeatmap && cropCellSizeM <= 30 && visibleGridPolygons.map(p => (
+            <Circle
+              key={p.key}
+              center={{ latitude: p.lat, longitude: p.lng }}
+              radius={cropCellSizeM / 2}
+              fillColor={p.fill}
+              strokeColor="transparent"
+              strokeWidth={0}
+            />
+          ))}
+          {showCropHeatmap && cropCellSizeM > 30 && visibleGridPolygons.map(p => (
             <Polygon
               key={p.key}
               coordinates={p.coords}
@@ -1058,7 +1068,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
 
         {/* VERSION TAG */}
         <View style={styles.versionTag}>
-          <Text style={styles.versionTagText}>AgroCrop v2.9</Text>
+          <Text style={styles.versionTagText}>AgroCrop v3.0</Text>
         </View>
 
         {/* FLOATING MAP CONTROLS (RIGHT) */}
