@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { StyleSheet, View, Text, ActivityIndicator, Platform, TouchableOpacity, Alert, Modal, TextInput, ScrollView, Switch, Share, Animated, Dimensions, Linking, PanResponder } from 'react-native';
+import { StyleSheet, View, Text, ActivityIndicator, Platform, TouchableOpacity, Alert, Modal, TextInput, ScrollView, Switch, Share, Animated, Dimensions, Linking, PanResponder, KeyboardAvoidingView } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import MapView, { Marker, Polygon, Polyline, Region, MapPressEvent } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -9,7 +9,7 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import NetInfo from '@react-native-community/netinfo';
 import { initDB } from '../core/Database';
-import { askClaudeGeologist, analyzeCropBiomassWithClaude, CropBiomassStats } from '../core/ClaudeServices';
+import { askClaudeGeologist, analyzeCropBiomassWithClaude, CropBiomassStats, askClaudeAgronomo, AGRONOMOS, PREGUNTAS_RAPIDAS } from '../core/ClaudeServices';
 import { getBiomassAnalysis, BiomassAnalysisResult, generateCirclePolygon, getBiomassGrid, GridCell, getBiomassExtended, BiomassExtendedResult } from '../core/GEEService';
 import { AgroCropPolygon, generatePolygonId, getPolygonColor, extractCoordsFromPhoto, calcConsolidatedSummary } from '../core/AgroCropService';
 
@@ -85,6 +85,13 @@ export default function AgroCropDashboard() {
   const [chatMessages, setChatMessages] = useState<{role: string, content: string}[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [isTypingChat, setIsTypingChat] = useState(false);
+
+  // --- Agrónomo IA ---
+  const [mensajesAgronomo, setMensajesAgronomo] = useState<{texto: string; esUsuario: boolean}[]>([]);
+  const [inputAgronomo, setInputAgronomo] = useState('');
+  const [cargandoAgronomo, setCargandoAgronomo] = useState(false);
+  const [cultivoChat, setCultivoChat] = useState('');
+  const agronomoScrollRef = useRef<ScrollView>(null);
 
   // --- Red y Sync ---
   const [isConnected, setIsConnected] = useState(true);
@@ -210,7 +217,7 @@ export default function AgroCropDashboard() {
 
   // Combined action sheet state
   const [showActionSheet, setShowActionSheet] = useState(false);
-  const [currentScreen, setCurrentScreen] = useState<'map' | 'parcelas' | 'nueva_parcela' | 'trazar' | 'coordenadas' | 'foto' | 'datos_parcela'>('map');
+  const [currentScreen, setCurrentScreen] = useState<'map' | 'parcelas' | 'nueva_parcela' | 'trazar' | 'coordenadas' | 'foto' | 'datos_parcela' | 'agronomo'>('map');
   const [datosParcelaFrom, setDatosParcelaFrom] = useState<'trazar' | 'coordenadas' | 'foto'>('trazar');
   const [toastMsg, setToastMsg] = useState('');
   const [showToast, setShowToast] = useState(false);
@@ -243,6 +250,65 @@ export default function AgroCropDashboard() {
       setIsTypingChat(false);
     }
   };
+
+  // ── Abrir pantalla del agrónomo ─────────────────────────────────────────
+  const abrirAgronomo = useCallback(async () => {
+    const cultivo = cropTipoCultivo || 'maiz_riego';
+    setCultivoChat(cultivo);
+    setCurrentScreen('agronomo');
+    if (mensajesAgronomo.length === 0) {
+      setCargandoAgronomo(true);
+      try {
+        const preguntaInicial = cropData
+          ? `Acabo de analizar mi parcela con AgroCrop. NDVI ${cropData.ndvi_mean}, estimado ${cropData.tonelaje_estimado} ton, vigor ${cropData.clasificacion_vigor}. ¿Qué me recomiendas?`
+          : '¡Hola! ¿Puedes presentarte y decirme cómo me puedes ayudar con mi cultivo?';
+        const saludo = await askClaudeAgronomo(
+          [{ role: 'user', content: preguntaInicial }],
+          cultivo,
+          cropData ?? undefined
+        );
+        setMensajesAgronomo([{ texto: saludo, esUsuario: false }]);
+      } catch {
+        const ag = AGRONOMOS[cultivo] ?? AGRONOMOS.maiz_riego;
+        setMensajesAgronomo([{ texto: `¡Hola! Soy ${ag.nombre}, ${ag.especialidad}. ¿En qué te puedo ayudar hoy?`, esUsuario: false }]);
+      } finally {
+        setCargandoAgronomo(false);
+      }
+    }
+  }, [cropTipoCultivo, cropData, mensajesAgronomo.length]);
+
+  const enviarMensajeAgronomo = useCallback(async (textoOverride?: string, imagenBase64?: string) => {
+    const texto = textoOverride ?? inputAgronomo.trim();
+    if (!texto && !imagenBase64) return;
+    if (cargandoAgronomo) return;
+    const userMsg = { texto: texto || '📸 Foto enviada', esUsuario: true };
+    const nuevos = [...mensajesAgronomo, userMsg];
+    setMensajesAgronomo(nuevos);
+    setInputAgronomo('');
+    setCargandoAgronomo(true);
+    triggerHaptic('medium');
+    setTimeout(() => agronomoScrollRef.current?.scrollToEnd({ animated: true }), 80);
+    try {
+      const historialApi = nuevos.map(m => ({ role: m.esUsuario ? 'user' : 'assistant', content: m.texto }));
+      const respuesta = await askClaudeAgronomo(historialApi, cultivoChat, cropData ?? undefined, imagenBase64);
+      setMensajesAgronomo(prev => [...prev, { texto: respuesta, esUsuario: false }]);
+      triggerHaptic('success');
+      setTimeout(() => agronomoScrollRef.current?.scrollToEnd({ animated: true }), 80);
+    } catch (e: any) {
+      setMensajesAgronomo(prev => [...prev, { texto: `Sin conexión: ${e.message?.substring(0, 60)}`, esUsuario: false }]);
+    } finally {
+      setCargandoAgronomo(false);
+    }
+  }, [inputAgronomo, cargandoAgronomo, mensajesAgronomo, cultivoChat, cropData]);
+
+  const tomarFotoParaAgronomo = useCallback(async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') { Alert.alert('Permiso requerido', 'Necesitamos acceso a la cámara para analizar fotos.'); return; }
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7, base64: true });
+    if (!result.canceled && result.assets[0]?.base64) {
+      await enviarMensajeAgronomo('¿Qué problema tiene esta planta? Analiza la foto.', result.assets[0].base64);
+    }
+  }, [enviarMensajeAgronomo]);
 
   // ── AgroCrop analysis flow ─────────────────────────────────────────────
   const startCropAnalysis = async (coordsOverride?: Coordinate[], tipoOverride?: string) => {
@@ -1335,6 +1401,12 @@ _Datos: ESA Copernicus, NASA, USGS_`;
             <Text style={styles.bottomBtnSecondaryText}>📂 Parcelas</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            style={[styles.bottomBtnSecondary, { borderColor: '#C8E6C9' }]}
+            onPress={abrirAgronomo}
+          >
+            <Text style={styles.bottomBtnSecondaryText}>🌿 Agrónomo</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[styles.bottomBtnSecondary, { flex: 0.3, borderColor: '#DDD' }]}
             onPress={() => setShowConfigModal(true)}
           >
@@ -2056,6 +2128,129 @@ _Datos: ESA Copernicus, NASA, USGS_`;
           </View>
         </TouchableOpacity>
       )}
+
+      {/* ═══ SCREEN: AGRÓNOMO IA ═══ */}
+      {currentScreen === 'agronomo' && (() => {
+        const ag = AGRONOMOS[cultivoChat] ?? AGRONOMOS.maiz_riego;
+        const preguntas = PREGUNTAS_RAPIDAS[cultivoChat] ?? PREGUNTAS_RAPIDAS.maiz_riego;
+        return (
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, zIndex: 300 }}
+          >
+            <View style={{ flex: 1, backgroundColor: '#FAFAFA' }}>
+              {/* Header */}
+              <View style={styles.agronomoHeader}>
+                <TouchableOpacity onPress={() => setCurrentScreen('map')} style={{ marginRight: 12, padding: 4 }}>
+                  <Text style={{ color: '#FFF', fontSize: 20 }}>←</Text>
+                </TouchableOpacity>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.agronomoHeaderTitle}>🌿 Tu Agrónomo</Text>
+                  <Text style={styles.agronomoHeaderSub} numberOfLines={1}>{ag.nombre} · {ag.especialidad}</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    setMensajesAgronomo([]);
+                    setCargandoAgronomo(false);
+                    setCultivoChat('');
+                    setTimeout(() => abrirAgronomo(), 50);
+                  }}
+                  style={{ padding: 4 }}
+                >
+                  <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>Nueva chat</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Messages */}
+              <ScrollView
+                ref={agronomoScrollRef}
+                style={{ flex: 1 }}
+                contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
+                keyboardShouldPersistTaps="handled"
+              >
+                {mensajesAgronomo.length === 0 && !cargandoAgronomo && (
+                  <View style={styles.agronomoEmpty}>
+                    <Text style={{ fontSize: 48, marginBottom: 12 }}>{ag.avatar}</Text>
+                    <Text style={styles.agronomoEmptyTitle}>{ag.nombre}</Text>
+                    <Text style={styles.agronomoEmptySub}>{ag.especialidad}</Text>
+                    <Text style={[styles.agronomoEmptySub, { marginTop: 8 }]}>Conectando con tu agrónomo...</Text>
+                  </View>
+                )}
+                {mensajesAgronomo.map((msg, i) => (
+                  <View key={i} style={[styles.agronomoMsgRow, msg.esUsuario && { justifyContent: 'flex-end' }]}>
+                    {!msg.esUsuario && (
+                      <View style={styles.agronomoAvatar}>
+                        <Text style={{ fontSize: 18 }}>{ag.avatar}</Text>
+                      </View>
+                    )}
+                    <View style={[
+                      styles.agronomoBubble,
+                      msg.esUsuario ? styles.agronomoBubbleUser : styles.agronomoBubbleBot,
+                    ]}>
+                      <Text style={[styles.agronomoBubbleText, msg.esUsuario && { color: '#FFF' }]}>
+                        {msg.texto}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+                {cargandoAgronomo && (
+                  <View style={[styles.agronomoMsgRow]}>
+                    <View style={styles.agronomoAvatar}>
+                      <Text style={{ fontSize: 18 }}>{ag.avatar}</Text>
+                    </View>
+                    <View style={[styles.agronomoBubble, styles.agronomoBubbleBot, { paddingVertical: 14 }]}>
+                      <ActivityIndicator size="small" color={COLORS.verdeMedio} />
+                    </View>
+                  </View>
+                )}
+
+                {/* Quick questions — show after first bot message */}
+                {mensajesAgronomo.length <= 1 && !cargandoAgronomo && (
+                  <View style={{ marginTop: 12 }}>
+                    <Text style={styles.agronomoQLabel}>Preguntas frecuentes:</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                      {preguntas.map((p, i) => (
+                        <TouchableOpacity
+                          key={i}
+                          style={styles.agronomoChip}
+                          onPress={() => enviarMensajeAgronomo(p)}
+                        >
+                          <Text style={styles.agronomoChipText}>{p}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </ScrollView>
+
+              {/* Input bar */}
+              <View style={styles.agronomoInputBar}>
+                <TouchableOpacity onPress={tomarFotoParaAgronomo} style={styles.agronomoIconBtn}>
+                  <Text style={{ fontSize: 22 }}>📸</Text>
+                </TouchableOpacity>
+                <TextInput
+                  style={styles.agronomoInput}
+                  placeholder="Pregunta al agrónomo..."
+                  placeholderTextColor="#AAA"
+                  value={inputAgronomo}
+                  onChangeText={setInputAgronomo}
+                  multiline
+                  returnKeyType="send"
+                  blurOnSubmit={false}
+                  onSubmitEditing={() => enviarMensajeAgronomo()}
+                />
+                <TouchableOpacity
+                  style={[styles.agronomoSendBtn, { backgroundColor: inputAgronomo.trim() ? COLORS.verdeMedio : '#CCC' }]}
+                  onPress={() => enviarMensajeAgronomo()}
+                  disabled={!inputAgronomo.trim() || cargandoAgronomo}
+                >
+                  <Text style={{ color: '#FFF', fontSize: 18, fontWeight: '700' }}>↑</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        );
+      })()}
 
       {/* ═══ SCREEN: MIS PARCELAS ═══ */}
       {currentScreen === 'parcelas' && (
@@ -2801,6 +2996,54 @@ const styles = StyleSheet.create({
   // Error
   errorCard: { backgroundColor: '#FFF5F5', borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#FFCDD2' },
   errorCardText: { color: COLORS.rojo, fontSize: 13 },
+
+  // Agrónomo IA Screen
+  agronomoHeader: {
+    height: 72, backgroundColor: COLORS.verdePrimario,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 12 : 0,
+  },
+  agronomoHeaderTitle: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  agronomoHeaderSub: { color: 'rgba(255,255,255,0.75)', fontSize: 11, marginTop: 1 },
+  agronomoEmpty: { alignItems: 'center', paddingVertical: 40 },
+  agronomoEmptyTitle: { color: '#333', fontSize: 16, fontWeight: '700', marginBottom: 4 },
+  agronomoEmptySub: { color: '#888', fontSize: 12, textAlign: 'center' },
+  agronomoMsgRow: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 12 },
+  agronomoAvatar: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: '#E8F5E9', alignItems: 'center',
+    justifyContent: 'center', marginRight: 8,
+  },
+  agronomoBubble: { maxWidth: '75%', borderRadius: 16, padding: 12 },
+  agronomoBubbleBot: {
+    backgroundColor: '#FFF', borderBottomLeftRadius: 4,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06, shadowRadius: 3, elevation: 2,
+  },
+  agronomoBubbleUser: { backgroundColor: COLORS.verdeMedio, borderBottomRightRadius: 4 },
+  agronomoBubbleText: { color: '#1C1C1E', fontSize: 15, lineHeight: 22 },
+  agronomoQLabel: { color: '#888', fontSize: 11, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 },
+  agronomoChip: {
+    backgroundColor: '#FFF', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7,
+    borderWidth: 1, borderColor: '#DDD',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1,
+  },
+  agronomoChipText: { color: COLORS.verdeMedio, fontSize: 13, fontWeight: '500' },
+  agronomoInputBar: {
+    flexDirection: 'row', alignItems: 'flex-end', padding: 12,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 12,
+    borderTopWidth: 1, borderTopColor: '#EBEBEB', backgroundColor: '#FFF', gap: 8,
+  },
+  agronomoIconBtn: { padding: 6 },
+  agronomoInput: {
+    flex: 1, backgroundColor: '#F5F5F5', borderRadius: 20,
+    paddingHorizontal: 16, paddingVertical: 10, fontSize: 15,
+    maxHeight: 100, color: '#1C1C1E',
+  },
+  agronomoSendBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center',
+  },
 
   // Freshness
   freshnessCard: {

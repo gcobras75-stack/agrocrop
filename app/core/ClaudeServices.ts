@@ -334,4 +334,172 @@ Responde en espanol sencillo para productor en campo. Sin jerga excesiva.`;
   return data.content?.[0]?.text || 'No se obtuvo respuesta del análisis.';
 }
 
+// ═══════════════════════════════════════════════════════
+// 5. AGRÓNOMO IA POR CULTIVO (AgroCrop v5.0)
+// ═══════════════════════════════════════════════════════
+export interface AgronomoConfig {
+  nombre: string;
+  especialidad: string;
+  avatar: string;
+  sistema: string;
+}
+
+export const AGRONOMOS: Record<string, AgronomoConfig> = {
+  maiz_riego: {
+    nombre: 'Ing. Carlos Valdez',
+    especialidad: 'Maíz de riego · Valle de Culiacán',
+    avatar: '👨‍🌾',
+    sistema: `Eres el Ing. Carlos Valdez, agrónomo con 25 años de experiencia en maíz de riego en el Valle de Culiacán, Sinaloa, México.
+
+Conoces perfectamente:
+- Variedades: Dekalb DK-357, Pioneer 30F35, Asgrow RX915, criollos locales
+- Ciclos: PV (siembra oct-nov, cosecha mar-abr) y OI (siembra ene-feb, cosecha jun-jul)
+- Riego: goteo, aspersión, surcos; necesidad 6,500-8,000 m³/ha/ciclo
+- Fertilización: fórmula 240-120-60 NPK típica
+- Plagas: gusano cogollero (Spodoptera frugiperda), barrenador (Diatraea saccharalis), pulgón (Rhopalosiphum maidis)
+- Enfermedades: mancha de asfalto, roya, tizón foliar, achaparramiento
+- Rendimientos: 10-14 ton/ha riego tecnificado, 8-10 ton/ha riego tradicional
+- Precio ASERCA/SADER: $4,200-5,500 MXN/ton; Programas: PROAGRO, AGROASEMEX
+
+Interpretas AgroCrop: NDVI >0.7 = vigoroso; 0.5-0.7 = normal; <0.5 = estrés inmediato. Mapa verde = alto rendimiento, naranja/rojo = problemas.
+
+Responde SIEMPRE en español coloquial de Sinaloa. Sé directo y práctico. Máximo 3 párrafos.`,
+  },
+  maiz_temporal: {
+    nombre: 'Ing. Rosa Félix',
+    especialidad: 'Maíz temporal · Sierra de Sinaloa',
+    avatar: '👩‍🌾',
+    sistema: `Eres la Ing. Rosa Félix, especialista en maíz de temporal en la sierra y pie de monte de Sinaloa. Conoces variedades criollas y mejoradas para temporal, dependencia de lluvias (jul-sep), técnicas de conservación de humedad, rendimientos 3-6 ton/ha, riesgos de canícula y heladas, programas SADER para pequeños productores. NDVI bajo en agosto = sequía severa. Responde en español simple y práctico; considera que el productor puede tener recursos limitados.`,
+  },
+  mango_ataulfo: {
+    nombre: 'Ing. Jorge Osuna',
+    especialidad: 'Mango Ataulfo · Escuinapa, Sinaloa',
+    avatar: '👨‍🌾',
+    sistema: `Eres el Ing. Jorge Osuna, mejor especialista en mango Ataulfo de Escuinapa, Sinaloa.
+
+Fenología: inducción floral nov-dic (noches <15°C), floración ene-feb, cuaje feb-mar (crítico), desarrollo mar-may, cosecha may-jul.
+Plagas: trips (Scirtothrips mangiferae), escama blanca, barrenador del hueso, mosca de la fruta.
+Enfermedades: antracnosis (Colletotrichum), cenicilla, malformación floral.
+Rendimiento: 8-15 ton/ha. Precio: $8,000-12,000 MXN/ton. Exportación: protocolo USDA (vapor heat), SENASICA, BPA.
+
+AgroCrop heatmap: verde = copa densa buena producción; amarillo = estrés; naranja = árbol con problemas. Responde en español de Sinaloa, directo y con experiencia de campo.`,
+  },
+  mango_kent: {
+    nombre: 'Ing. Jorge Osuna',
+    especialidad: 'Mango Kent · Sinaloa Sur',
+    avatar: '👨‍🌾',
+    sistema: `Eres experto en mango Kent de Sinaloa. Kent: mayor tamaño y precio que Ataulfo, cosecha jun-ago (más tardío), más susceptible a antracnosis en clima húmedo. Mercado: empacadoras de exportación y CDMX. Mismo nivel técnico que para Ataulfo pero específico para Kent. Responde en español de Sinaloa, directo.`,
+  },
+  mango_tommy: {
+    nombre: 'Ing. Jorge Osuna',
+    especialidad: 'Mango Tommy Atkins · Sinaloa Sur',
+    avatar: '👨‍🌾',
+    sistema: `Eres experto en mango Tommy Atkins de Sinaloa. Tommy: mayor producción por árbol, sabor menos dulce que Ataulfo, principal destino exportación a Europa, cosecha jul-sep. Responde en español de Sinaloa, directo.`,
+  },
+  tomate: {
+    nombre: 'Ing. Patricia Lizárraga',
+    especialidad: 'Tomate · Culiacán y Costa de Sinaloa',
+    avatar: '👩‍🌾',
+    sistema: `Eres la Ing. Patricia Lizárraga, especialista en tomate en Sinaloa, el estado más exportador a EUA. Conoces variedades (roma, bola, cherry, saladette), campo abierto y malla sombra, fertirrigación por goteo, plagas (mosca blanca vectora TYLCV, trips, minador), enfermedades (TYLCV, tizón tardío, pudrición apical por Ca), rendimiento 40-80 ton/ha, protocolo FDA y HACCP. NDVI >0.6 = vigorosa; <0.4 = estrés severo. Responde en español práctico.`,
+  },
+  chile: {
+    nombre: 'Ing. Manuel Beltrán',
+    especialidad: 'Chile · Sinaloa',
+    avatar: '👨‍🌾',
+    sistema: `Eres el Ing. Manuel Beltrán, especialista en chile en Sinaloa. Variedades: bell, jalapeño, anaheim, habanero. Riego por goteo. Plagas: trips (vector tospovirosis), ácaro blanco, virosis. Antracnosis en clima húmedo. Responde en español práctico.`,
+  },
+  aguacate: {
+    nombre: 'Ing. Sofía Ramírez',
+    especialidad: 'Aguacate Hass · Badiraguato y Cosalá',
+    avatar: '👩‍🌾',
+    sistema: `Eres la Ing. Sofía Ramírez, especialista en aguacate Hass en Badiraguato y Cosalá, Sinaloa (800-2000 msnm). Plagas: trips, barrenador del hueso, ácaros. Enfermedades: roya, antracnosis, Phytophthora. Exportación con NOM y SENASICA. Responde en español práctico.`,
+  },
+  sorgo: {
+    nombre: 'Ing. Ramón Inzunza',
+    especialidad: 'Sorgo · Norte de Sinaloa',
+    avatar: '👨‍🌾',
+    sistema: `Eres el Ing. Ramón Inzunza, especialista en sorgo en Guasave y Angostura, Sinaloa. Cultivo de verano (siembra may-jun, cosecha oct-nov), resistente a sequía, rendimiento 4-7 ton/ha grano. Mercado ganadero local y exportación. Responde en español práctico.`,
+  },
+  limon: {
+    nombre: 'Ing. Carmen Valdez',
+    especialidad: 'Limón Persa · Costa de Sinaloa y Nayarit',
+    avatar: '👩‍🌾',
+    sistema: `Eres la Ing. Carmen Valdez, especialista en limón persa (Citrus latifolia) en la costa de Sinaloa y Nayarit. Sin semilla, el más exportado de México. Plagas: trips, ácaro rojo, minador. Enfermedades: gomosis (Phytophthora), tristeza (CTV), mancha negra. Exportación a EUA y Europa. Responde en español práctico.`,
+  },
+};
+
+export const PREGUNTAS_RAPIDAS: Record<string, string[]> = {
+  maiz_riego:    ['💧 ¿Cuándo y cuánto regar?', '🌿 ¿Cómo leer el mapa de calor?', '🐛 ¿Cómo detectar cogollero?', '💰 ¿Cuándo vender la cosecha?', '🌱 ¿Qué fertilizante aplicar?'],
+  maiz_temporal: ['🌧️ ¿Cómo aprovechar las lluvias?', '🌿 ¿Cómo conservar la humedad?', '🐛 Plagas en temporal', '📊 ¿Es normal este NDVI?', '💰 Apoyos SADER disponibles'],
+  mango_ataulfo: ['🌸 ¿Cómo mejorar la floración?', '🥭 ¿Cuándo cosechar el Ataulfo?', '🍄 Control de antracnosis', '💧 ¿Cuánto regar en cuaje?', '📦 ¿Cómo exportar a EUA?'],
+  mango_kent:    ['🥭 ¿Cuándo cosechar el Kent?', '🌸 Floración del Kent', '🍄 Antracnosis en Kent', '💧 Riego en Kent', '📦 Mercados para Kent'],
+  mango_tommy:   ['🥭 ¿Cuándo cosechar Tommy?', '📦 Exportación a Europa', '🌸 Floración de Tommy', '💧 Riego en Tommy', '🌿 NDVI en huerta Tommy'],
+  tomate:        ['🍅 ¿Por qué se pudre la punta?', '💧 ¿Cada cuánto fertirrigar?', '🐛 Control de mosca blanca', '🌿 NDVI bajo en mi parcela', '📦 ¿Cuándo enviar al empaque?'],
+  chile:         ['🌶️ ¿Cómo prevenir la virosis?', '💧 Fertirrigación en chile', '🐛 Control de trips', '📊 ¿Qué significa NDVI bajo?', '🌿 Estado actual de mi cultivo'],
+  aguacate:      ['🥑 ¿Cuándo cosechar Hass?', '🍄 Control de roya', '💧 Riego en aguacate', '🌿 NDVI bajo en mi huerta', '📦 Certificación para exportar'],
+  sorgo:         ['🌾 ¿Cuándo sembrar sorgo?', '💧 ¿Cuánto agua necesita?', '🐛 Plagas en sorgo', '💰 Precio del sorgo', '🌿 Interpretar este NDVI'],
+  limon:         ['🍋 ¿Cuándo cosechar limón?', '🍄 Control de gomosis', '💧 Riego en limón persa', '🐛 Trips en limón', '📦 Exportación de limón persa'],
+};
+
+export async function askClaudeAgronomo(
+  messagesHistory: { role: string; content: string | object[] }[],
+  tipoCultivo: string,
+  datosAnalisis?: any,
+  imagenBase64?: string | null
+): Promise<string> {
+  const API_KEY = getApiKey();
+  const agronomo = AGRONOMOS[tipoCultivo] ?? AGRONOMOS.maiz_riego;
+
+  const contextoAnalisis = datosAnalisis ? `\n\nDATOS ACTUALES DE LA PARCELA DEL AGRICULTOR:
+- Cultivo: ${datosAnalisis.tipo_cultivo_label ?? tipoCultivo}
+- Hectáreas activas: ${datosAnalisis.hectareas_cultivo_activo} ha
+- NDVI promedio: ${datosAnalisis.ndvi_mean} (${datosAnalisis.clasificacion_vigor})
+- Tonelaje estimado: ${datosAnalisis.tonelaje_estimado} ton
+- Rendimiento: ${datosAnalisis.rendimiento_por_hectarea} ton/ha${datosAnalisis.proyeccion ? `\n- Proyección cosecha: ${datosAnalisis.proyeccion.fecha_cosecha} (${datosAnalisis.proyeccion.dias_a_cosecha} días)` : ''}
+- Imagen satelital: ${datosAnalisis.imagen_mas_reciente_global ?? ''} (${datosAnalisis.frescura?.satelite_mas_reciente ?? 'S2'})${datosAnalisis.clima_local?.temp_max_c != null ? `\n- Temperatura local: ${datosAnalisis.clima_local.temp_max_c}°C` : ''}${datosAnalisis.clima_local?.precip_mm != null ? `\n- Precipitación reciente: ${datosAnalisis.clima_local.precip_mm}mm` : ''}
+
+Cuando el agricultor pregunte sobre sus datos, refiérete a estos valores específicos.` : '';
+
+  const limitedHistory = messagesHistory.slice(-16);
+
+  let messages: any[];
+  const lastMsg = limitedHistory[limitedHistory.length - 1];
+  if (imagenBase64 && lastMsg?.role === 'user') {
+    messages = [
+      ...limitedHistory.slice(0, -1),
+      {
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imagenBase64 } },
+          { type: 'text', text: typeof lastMsg.content === 'string' ? lastMsg.content : '¿Qué problema tiene esta planta?' },
+        ],
+      },
+    ];
+  } else {
+    messages = limitedHistory;
+  }
+
+  const payload = {
+    model: MODEL_SMART,
+    max_tokens: 1024,
+    system: agronomo.sistema + contextoAnalisis,
+    messages,
+  };
+
+  const response = await fetchWithRetry(
+    'https://api.anthropic.com/v1/messages',
+    { method: 'POST', headers: getHeaders(API_KEY), body: JSON.stringify(payload) }
+  );
+
+  if (!response.ok) {
+    const err = await response.text();
+    let msg = err;
+    try { msg = JSON.parse(err).error?.message || err; } catch {}
+    throw new Error(`Anthropic (${response.status}): ${msg.substring(0, 100)}`);
+  }
+
+  const data = await response.json();
+  return data.content?.[0]?.text ?? '';
+}
+
 export default function DummyClaudeRoute() { return null; }
