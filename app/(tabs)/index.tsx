@@ -192,7 +192,11 @@ export default function AgroCropDashboard() {
 
   // Combined action sheet state
   const [showActionSheet, setShowActionSheet] = useState(false);
-  const [currentScreen, setCurrentScreen] = useState<'map' | 'parcelas' | 'nueva_parcela' | 'datos_parcela'>('map');
+  const [currentScreen, setCurrentScreen] = useState<'map' | 'parcelas' | 'nueva_parcela' | 'trazar' | 'coordenadas' | 'foto' | 'datos_parcela'>('map');
+  const [datosParcelaFrom, setDatosParcelaFrom] = useState<'trazar' | 'coordenadas' | 'foto'>('trazar');
+  const [toastMsg, setToastMsg] = useState('');
+  const [showToast, setShowToast] = useState(false);
+  const coordsTextRef = useRef('');
 
   const getCultivoEmoji = (tipo: string) => {
     const e: Record<string, string> = { maiz_riego: '🌽', maiz_temporal: '🌾', mango_ataulfo: '🥭', mango_kent: '🥭', mango_tommy: '🥭', tomate: '🍅', chile: '🌶️', aguacate: '🥑', sorgo: '🌾', limon: '🍋' };
@@ -506,8 +510,9 @@ _Datos: ESA Copernicus, NASA, USGS_`;
     } catch { return null; }
   };
 
-  const applyCoordsFromText = () => {
-    const coords = parseCoordsText(cropCoordsText);
+  const applyCoordsFromText = (textOverride?: string) => {
+    const text = textOverride !== undefined ? textOverride : cropCoordsText;
+    const coords = parseCoordsText(text);
     if (!coords) {
       Alert.alert('Error', 'Coordenadas invalidas. Necesitas minimo 3 pares lat,lng.');
       return;
@@ -523,7 +528,14 @@ _Datos: ESA Copernicus, NASA, USGS_`;
     const dLng = Math.max(...lngs) - Math.min(...lngs);
     mapRef.current?.animateToRegion({ latitude: cLat, longitude: cLng, latitudeDelta: dLat * 1.3, longitudeDelta: dLng * 1.3 }, 800);
     triggerHaptic('success');
-    setCropCoordsText('');
+    // If coming from parcelas flow, go to datos_parcela
+    if (currentScreen === 'coordenadas') {
+      setCropCoordsText('');
+      setDatosParcelaFrom('coordenadas');
+      setCurrentScreen('datos_parcela');
+    } else {
+      setCropCoordsText('');
+    }
   };
 
   const startCropDrawMode = () => {
@@ -542,6 +554,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
     console.log('[AgroCrop] Trazado finalizado:', polygonCoords.length, 'vertices');
     if (polygonCoords.length >= 3) {
       AsyncStorage.setItem('lastPolygon', JSON.stringify(polygonCoords));
+      setDatosParcelaFrom('trazar');
       setCurrentScreen('datos_parcela');
     }
   };
@@ -609,19 +622,21 @@ _Datos: ESA Copernicus, NASA, USGS_`;
   };
 
   // ── OCR: Internal processing function ────────────────────────────────────────
-  const procesarFotoTitulo = async (base64: string) => {
+  const procesarFotoTitulo = async (base64: string, fromFotoScreen = false) => {
     setOcrProcessing(true);
     setShowCropModal(false);
     setShowPhotoOptions(false);
-    setCropStep('Procesando titulo parcelario con IA...');
-    setShowCropResults(true);
-    setCropAnalyzing(true);
+    if (!fromFotoScreen) {
+      setCropStep('Procesando titulo parcelario con IA...');
+      setShowCropResults(true);
+      setCropAnalyzing(true);
+    }
 
     try {
       const ocr = await extractCoordsFromPhoto(base64);
       if (!ocr.vertices || ocr.vertices.length < 3) {
         Alert.alert('Error OCR', 'No se detectaron suficientes coordenadas (min 3)');
-        setShowCropResults(false);
+        if (!fromFotoScreen) setShowCropResults(false);
         return;
       }
 
@@ -651,25 +666,34 @@ _Datos: ESA Copernicus, NASA, USGS_`;
         longitudeDelta: (Math.max(...lngs) - Math.min(...lngs)) * 1.4,
       }, 800);
 
-      Alert.alert('Titulo procesado',
-        `${ocr.vertices.length} vertices detectados\n` +
-        `${ocr.datos?.superficie_ha ? ocr.datos.superficie_ha + ' ha' : ''}\n` +
-        `${ocr.datos?.propietario || ''}\n` +
-        `Confianza: ${ocr.confianza || '?'}`,
-        [{ text: 'Analizar', onPress: () => {
-          Alert.alert('Tipo de cultivo', 'Selecciona el cultivo de esta parcela', [
-            { text: 'Maiz Riego', onPress: () => { setCropTipoCultivo('maiz_riego'); startCropAnalysis(); } },
-            { text: 'Mango Ataulfo', onPress: () => { setCropTipoCultivo('mango_ataulfo'); startCropAnalysis(); } },
-            { text: 'Otro cultivo', onPress: () => { setShowCropModal(true); } },
-          ]);
-        }}, { text: 'Ver en mapa' }]
-      );
+      if (fromFotoScreen) {
+        // Navigate to datos_parcela with OCR-detected name pre-filled
+        if (ocr.datos?.ejido) setNewParcelName(ocr.datos.ejido);
+        setDatosParcelaFrom('foto');
+        setCurrentScreen('datos_parcela');
+      } else {
+        Alert.alert('Titulo procesado',
+          `${ocr.vertices.length} vertices detectados\n` +
+          `${ocr.datos?.superficie_ha ? ocr.datos.superficie_ha + ' ha' : ''}\n` +
+          `${ocr.datos?.propietario || ''}\n` +
+          `Confianza: ${ocr.confianza || '?'}`,
+          [{ text: 'Analizar', onPress: () => {
+            Alert.alert('Tipo de cultivo', 'Selecciona el cultivo de esta parcela', [
+              { text: 'Maiz Riego', onPress: () => { setCropTipoCultivo('maiz_riego'); startCropAnalysis(); } },
+              { text: 'Mango Ataulfo', onPress: () => { setCropTipoCultivo('mango_ataulfo'); startCropAnalysis(); } },
+              { text: 'Otro cultivo', onPress: () => { setShowCropModal(true); } },
+            ]);
+          }}, { text: 'Ver en mapa' }]
+        );
+      }
     } catch (e: any) {
       Alert.alert('Error', e.message);
     } finally {
       setOcrProcessing(false);
-      setCropAnalyzing(false);
-      setCropStep('');
+      if (!fromFotoScreen) {
+        setCropAnalyzing(false);
+        setCropStep('');
+      }
     }
   };
 
@@ -802,6 +826,12 @@ _Datos: ESA Copernicus, NASA, USGS_`;
     else if (type === 'medium') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     else if (type === 'light') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     else if (type === 'success') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const showToastNotification = (msg: string) => {
+    setToastMsg(msg);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 2500);
   };
 
   // Location Watcher
@@ -987,23 +1017,32 @@ _Datos: ESA Copernicus, NASA, USGS_`;
     <View style={styles.container}>
 
       {/* ═══ HEADER (60px) ═══ */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>🌿 AgroCrop</Text>
-        <View style={styles.headerRight}>
-          <TouchableOpacity
-            onPress={() => Alert.alert('Conexion', isConnected ? 'Online (Conectado a Claude)' : 'Offline (Motor Local)')}
-            style={styles.headerOnlineIndicator}
-          >
-            <View style={[styles.onlineDot, { backgroundColor: isConnected ? COLORS.verdeNeon : '#888' }]} />
+      {currentScreen === 'trazar' ? (
+        <View style={[styles.header, { backgroundColor: COLORS.verdeMedio }]}>
+          <TouchableOpacity onPress={() => { setCurrentScreen('nueva_parcela'); setCropDrawing(false); setPolygonCoords([]); setDrawingType('none'); }} style={{ marginRight: 12 }}>
+            <Text style={{ color: '#FFF', fontSize: 18 }}>←</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.mapTypeToggle}
-            onPress={() => setMapType(mapType === 'satellite' ? 'standard' : 'satellite')}
-          >
-            <Text style={styles.mapTypeText}>{mapType === 'satellite' ? 'SAT' : 'MAP'}</Text>
-          </TouchableOpacity>
+          <Text style={styles.headerTitle}>✏️ Trazar Parcela</Text>
         </View>
-      </View>
+      ) : (
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>🌿 AgroCrop</Text>
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              onPress={() => Alert.alert('Conexion', isConnected ? 'Online (Conectado a Claude)' : 'Offline (Motor Local)')}
+              style={styles.headerOnlineIndicator}
+            >
+              <View style={[styles.onlineDot, { backgroundColor: isConnected ? COLORS.verdeNeon : '#888' }]} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.mapTypeToggle}
+              onPress={() => setMapType(mapType === 'satellite' ? 'standard' : 'satellite')}
+            >
+              <Text style={styles.mapTypeText}>{mapType === 'satellite' ? 'SAT' : 'MAP'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* ═══ MAP (flex 0.60) ═══ */}
       <View style={styles.mapContainer}>
@@ -1136,27 +1175,27 @@ _Datos: ESA Copernicus, NASA, USGS_`;
               <View style={{ width: 2, height: 40, backgroundColor: COLORS.verdeClaro, position: 'absolute' }} />
               <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: COLORS.verdeClaro, backgroundColor: 'transparent' }} />
             </View>
-            {/* Bottom controls */}
-            <View style={{ position: 'absolute', bottom: 100, left: 16, right: 16, zIndex: 999, gap: 8 }}>
+            {/* Bottom controls — bottom offset depends on whether bottom bar is visible */}
+            <View style={{ position: 'absolute', bottom: currentScreen === 'trazar' ? 24 : 100, left: 16, right: 16, zIndex: 999, gap: 8 }}>
               {/* Main action: AGREGAR PUNTO */}
               <TouchableOpacity style={{ backgroundColor: COLORS.verdeMedio, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 }} onPress={addPointFromCrosshair}>
                 <MaterialCommunityIcons name="map-marker-plus" size={22} color="#FFF" />
-                <Text style={{ color: '#FFF', fontWeight: '900', fontSize: 16 }}>AGREGAR PUNTO ({polygonCoords.length})</Text>
+                <Text style={{ color: '#FFF', fontWeight: '900', fontSize: 16 }}>📍 AGREGAR PUNTO ({polygonCoords.length})</Text>
               </TouchableOpacity>
               {/* Secondary row */}
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 {polygonCoords.length > 0 && (
                   <TouchableOpacity style={{ flex: 1, backgroundColor: '#FFF', height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, borderWidth: 1, borderColor: '#DDD' }} onPress={() => setPolygonCoords(polygonCoords.slice(0, -1))}>
                     <MaterialCommunityIcons name="undo" size={16} color="#666" />
-                    <Text style={{ color: '#666', fontWeight: '600', fontSize: 14 }}>Deshacer</Text>
+                    <Text style={{ color: '#666', fontWeight: '600', fontSize: 14 }}>↶ Deshacer</Text>
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity style={{ flex: 1, backgroundColor: '#FFF', height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.rojo }} onPress={() => { setCropDrawing(false); selectMode('none'); setPolygonCoords([]); }}>
+                <TouchableOpacity style={{ flex: 1, backgroundColor: '#FFF', height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.rojo }} onPress={() => { setCropDrawing(false); selectMode('none'); setPolygonCoords([]); if (currentScreen === 'trazar') setCurrentScreen('nueva_parcela'); }}>
                   <Text style={{ color: COLORS.rojo, fontWeight: '600', fontSize: 14 }}>Cancelar</Text>
                 </TouchableOpacity>
                 {polygonCoords.length >= 3 && (
                   <TouchableOpacity style={{ flex: 2, backgroundColor: '#00C853', height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }} onPress={finishCropDraw}>
-                    <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 14 }}>✅ LISTO</Text>
+                    <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 14 }}>✅ LISTO ({polygonCoords.length})</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -1242,40 +1281,42 @@ _Datos: ESA Copernicus, NASA, USGS_`;
         </View>
       )}
 
-      {/* ═══ BOTTOM BAR (88px) ═══ */}
-      <View style={styles.bottomBar}>
-        <TouchableOpacity
-          style={[styles.bottomBtnPrimary, polygonCoords.length >= 3 && { backgroundColor: '#00C853' }]}
-          onPress={async () => {
-            if (polygonCoords.length >= 3) {
-              Alert.alert('¿Que cultivo tienes?', 'Selecciona para analizar', [
-                { text: '🌽 Maiz de riego', onPress: () => startCropAnalysis(polygonCoords, 'maiz_riego') },
-                { text: '🌾 Maiz temporal', onPress: () => startCropAnalysis(polygonCoords, 'maiz_temporal') },
-                { text: '🥭 Mango', onPress: () => startCropAnalysis(polygonCoords, 'mango_ataulfo') },
-                { text: '🍅 Tomate', onPress: () => startCropAnalysis(polygonCoords, 'tomate') },
-                { text: 'Cancelar', style: 'cancel' },
-              ]);
-            } else {
-              await cargarParcelas();
-              setShowActionSheet(true);
-            }
-          }}
-        >
-          <Text style={styles.bottomBtnPrimaryText}>{polygonCoords.length >= 3 ? '🚀 Analizar' : '+ Nueva Parcela'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.bottomBtnSecondary}
-          onPress={async () => { await cargarParcelas(); setCurrentScreen('parcelas'); }}
-        >
-          <Text style={styles.bottomBtnSecondaryText}>📂 Parcelas</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.bottomBtnSecondary, { flex: 0.3, borderColor: '#DDD' }]}
-          onPress={() => setShowConfigModal(true)}
-        >
-          <Text style={{ color: '#999', fontSize: 18 }}>⚙️</Text>
-        </TouchableOpacity>
-      </View>
+      {/* ═══ BOTTOM BAR (88px) — hidden during trazar mode ═══ */}
+      {currentScreen !== 'trazar' && (
+        <View style={styles.bottomBar}>
+          <TouchableOpacity
+            style={[styles.bottomBtnPrimary, polygonCoords.length >= 3 && { backgroundColor: '#00C853' }]}
+            onPress={async () => {
+              if (polygonCoords.length >= 3) {
+                Alert.alert('¿Que cultivo tienes?', 'Selecciona para analizar', [
+                  { text: '🌽 Maiz de riego', onPress: () => startCropAnalysis(polygonCoords, 'maiz_riego') },
+                  { text: '🌾 Maiz temporal', onPress: () => startCropAnalysis(polygonCoords, 'maiz_temporal') },
+                  { text: '🥭 Mango', onPress: () => startCropAnalysis(polygonCoords, 'mango_ataulfo') },
+                  { text: '🍅 Tomate', onPress: () => startCropAnalysis(polygonCoords, 'tomate') },
+                  { text: 'Cancelar', style: 'cancel' },
+                ]);
+              } else {
+                await cargarParcelas();
+                setShowActionSheet(true);
+              }
+            }}
+          >
+            <Text style={styles.bottomBtnPrimaryText}>{polygonCoords.length >= 3 ? '🚀 Analizar' : '+ Nueva Parcela'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.bottomBtnSecondary}
+            onPress={async () => { await cargarParcelas(); setCurrentScreen('parcelas'); }}
+          >
+            <Text style={styles.bottomBtnSecondaryText}>📂 Parcelas</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.bottomBtnSecondary, { flex: 0.3, borderColor: '#DDD' }]}
+            onPress={() => setShowConfigModal(true)}
+          >
+            <Text style={{ color: '#999', fontSize: 18 }}>⚙️</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* ═══ CHAT AGRONOMICO MODAL ═══ */}
       <Modal visible={showChatModal} transparent animationType="slide">
@@ -1507,7 +1548,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
                   onChangeText={setCropCoordsText}
                   keyboardType="numbers-and-punctuation"
                 />
-                <TouchableOpacity style={[styles.coordsProcessBtn, { height: 50, borderRadius: 12 }]} onPress={applyCoordsFromText}>
+                <TouchableOpacity style={[styles.coordsProcessBtn, { height: 50, borderRadius: 12 }]} onPress={() => applyCoordsFromText()}>
                   <Text style={styles.coordsProcessBtnText}>📍 PROCESAR COORDENADAS</Text>
                 </TouchableOpacity>
 
@@ -2028,39 +2069,180 @@ _Datos: ESA Copernicus, NASA, USGS_`;
           <ScrollView style={{ flex: 1, padding: 16 }}>
             <Text style={{ fontSize: 18, fontWeight: '700', color: COLORS.negroSuave, marginBottom: 16 }}>¿Como defines tu parcela?</Text>
             {[
-              { icon: '✏️', title: 'Trazar en el mapa', desc: 'Dibuja el contorno directamente en el mapa', action: () => { setCurrentScreen('map'); startCropDrawMode(); } },
-              { icon: '📍', title: 'Escribir coordenadas', desc: 'Ingresa los puntos GPS de tu parcela', action: () => { setCropAreaMode('coords'); setCurrentScreen('map'); setShowCropModal(true); } },
-              { icon: '📸', title: 'Fotografiar titulo', desc: 'La IA extrae las coordenadas del titulo parcelario', action: () => { setCurrentScreen('map'); setShowPhotoOptions(true); } },
+              {
+                icon: '✏️', title: 'Trazar en el mapa',
+                desc: 'Dibuja el contorno con el\ndedo directamente en el mapa',
+                action: () => {
+                  setPolygonCoords([]);
+                  setDrawingType('polygon');
+                  setCropDrawing(true);
+                  setCropAreaMode('draw');
+                  setCurrentScreen('trazar');
+                },
+              },
+              {
+                icon: '📍', title: 'Escribir coordenadas',
+                desc: 'Ingresa los puntos GPS\nde tu parcela',
+                action: () => { setCropCoordsText(''); setCurrentScreen('coordenadas'); },
+              },
+              {
+                icon: '📸', title: 'Fotografiar titulo',
+                desc: 'Sacale foto al titulo\nparcelario y la IA extrae\nlas coordenadas',
+                action: () => setCurrentScreen('foto'),
+              },
             ].map((opt, i) => (
               <TouchableOpacity
                 key={i}
-                style={{ backgroundColor: '#FFF', borderRadius: 14, padding: 20, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}
+                style={{ backgroundColor: '#FFF', borderRadius: 14, padding: 20, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2, flexDirection: 'row', alignItems: 'center', gap: 16 }}
                 onPress={opt.action}
               >
-                <Text style={{ fontSize: 32, marginBottom: 8 }}>{opt.icon}</Text>
-                <Text style={{ fontSize: 17, fontWeight: '700', color: COLORS.negroSuave, marginBottom: 4 }}>{opt.title}</Text>
-                <Text style={{ fontSize: 14, color: '#888', lineHeight: 20 }}>{opt.desc}</Text>
+                <View style={{ width: 56, height: 56, borderRadius: 14, backgroundColor: COLORS.verdeSuave, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 28 }}>{opt.icon}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: COLORS.negroSuave, marginBottom: 4 }}>{opt.title}</Text>
+                  <Text style={{ fontSize: 13, color: '#888', lineHeight: 19 }}>{opt.desc}</Text>
+                </View>
+                <Text style={{ color: '#CCC', fontSize: 20 }}>›</Text>
               </TouchableOpacity>
             ))}
+            <View style={{ height: 40 }} />
           </ScrollView>
         </View>
       )}
 
-      {/* ═══ SCREEN: DATOS PARCELA (after polygon drawn) ═══ */}
-      {currentScreen === 'datos_parcela' && (
+      {/* ═══ SCREEN: COORDENADAS ═══ */}
+      {currentScreen === 'coordenadas' && (
         <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: COLORS.blanco, zIndex: 302 }}>
           <View style={{ height: 60, backgroundColor: COLORS.verdePrimario, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 10 : 0 }}>
-            <TouchableOpacity onPress={() => { setCurrentScreen('map'); setCropDrawing(true); }} style={{ marginRight: 16 }}>
+            <TouchableOpacity onPress={() => setCurrentScreen('nueva_parcela')} style={{ marginRight: 16 }}>
+              <Text style={{ color: '#FFF', fontSize: 18 }}>←</Text>
+            </TouchableOpacity>
+            <Text style={{ color: '#FFF', fontSize: 18, fontWeight: '700' }}>📍 Coordenadas</Text>
+          </View>
+          <ScrollView style={{ flex: 1, padding: 16 }} keyboardShouldPersistTaps="handled">
+            <Text style={{ fontSize: 15, fontWeight: '600', color: COLORS.negroSuave, marginBottom: 4 }}>Escribe un punto por linea:</Text>
+            <Text style={{ fontSize: 13, color: '#888', marginBottom: 12 }}>Ejemplo: 24.3994, -107.1714</Text>
+            <TextInput
+              style={{ borderWidth: 1.5, borderColor: COLORS.verdeMedio, borderRadius: 12, padding: 14, fontSize: 15, color: COLORS.negroSuave, backgroundColor: '#F9F9F9', height: 180, textAlignVertical: 'top', marginBottom: 16 }}
+              multiline
+              placeholder={'24.3994, -107.1714\n24.4500, -107.1714\n24.4500, -107.1200\n24.3994, -107.1200'}
+              placeholderTextColor="#BBB"
+              value={cropCoordsText}
+              onChangeText={(t) => { setCropCoordsText(t); coordsTextRef.current = t; }}
+              keyboardType="numbers-and-punctuation"
+              autoFocus
+            />
+
+            <Text style={{ fontSize: 13, color: '#999', marginBottom: 10, fontWeight: '600' }}>Atajos:</Text>
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 24 }}>
+              <TouchableOpacity
+                style={{ flex: 1, backgroundColor: COLORS.verdeSuave, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: COLORS.verdeClaro, alignItems: 'center' }}
+                onPress={() => setCropCoordsText('24.3994, -107.1714\n24.4500, -107.1714\n24.4500, -107.1200\n24.3994, -107.1200')}
+              >
+                <Text style={{ color: COLORS.verdeMedio, fontWeight: '700', fontSize: 13 }}>📍 Oso Viejo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1, backgroundColor: COLORS.verdeSuave, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: COLORS.verdeClaro, alignItems: 'center' }}
+                onPress={() => setCropCoordsText('22.8500, -105.8000\n22.8500, -105.7500\n22.8100, -105.7500\n22.8100, -105.8000')}
+              >
+                <Text style={{ color: COLORS.verdeMedio, fontWeight: '700', fontSize: 13 }}>📍 Escuinapa</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={{ backgroundColor: COLORS.verdeMedio, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 }}
+              onPress={() => applyCoordsFromText(cropCoordsText)}
+            >
+              <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 16 }}>✅ PROCESAR COORDENADAS</Text>
+            </TouchableOpacity>
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        </View>
+      )}
+
+      {/* ═══ SCREEN: FOTO TITULO ═══ */}
+      {currentScreen === 'foto' && (
+        <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: COLORS.blanco, zIndex: 302 }}>
+          <View style={{ height: 60, backgroundColor: COLORS.verdePrimario, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 10 : 0 }}>
+            <TouchableOpacity onPress={() => setCurrentScreen('nueva_parcela')} style={{ marginRight: 16 }}>
+              <Text style={{ color: '#FFF', fontSize: 18 }}>←</Text>
+            </TouchableOpacity>
+            <Text style={{ color: '#FFF', fontSize: 18, fontWeight: '700' }}>📸 Fotografiar Titulo</Text>
+          </View>
+          <View style={{ flex: 1, padding: 20, justifyContent: 'center', gap: 16 }}>
+            <TouchableOpacity
+              style={{ backgroundColor: '#FFF', borderRadius: 20, padding: 32, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 4, borderWidth: 2, borderColor: COLORS.verdeSuave }}
+              onPress={async () => {
+                try {
+                  const { status } = await ImagePicker.requestCameraPermissionsAsync();
+                  if (status !== 'granted') { Alert.alert('Permisos', 'Se necesitan permisos de camara.'); return; }
+                  const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.8, base64: true });
+                  if (result.canceled || !result.assets?.[0]?.base64) return;
+                  await procesarFotoTitulo(result.assets[0].base64, true);
+                } catch (e: any) { Alert.alert('Error', e.message); }
+              }}
+              disabled={ocrProcessing}
+            >
+              <Text style={{ fontSize: 52, marginBottom: 12 }}>📷</Text>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: COLORS.negroSuave, textAlign: 'center' }}>TOMAR FOTO</Text>
+              <Text style={{ fontSize: 13, color: '#888', marginTop: 6, textAlign: 'center' }}>con la camara</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{ backgroundColor: '#FFF', borderRadius: 20, padding: 32, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 4, borderWidth: 2, borderColor: COLORS.verdeSuave }}
+              onPress={async () => {
+                try {
+                  const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.8, base64: true });
+                  if (result.canceled || !result.assets?.[0]?.base64) return;
+                  await procesarFotoTitulo(result.assets[0].base64, true);
+                } catch (e: any) { Alert.alert('Error', e.message); }
+              }}
+              disabled={ocrProcessing}
+            >
+              <Text style={{ fontSize: 52, marginBottom: 12 }}>🖼️</Text>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: COLORS.negroSuave, textAlign: 'center' }}>ELEGIR DE GALERÍA</Text>
+              <Text style={{ fontSize: 13, color: '#888', marginTop: 6, textAlign: 'center' }}>de mis fotos</Text>
+            </TouchableOpacity>
+
+            {ocrProcessing ? (
+              <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+                <ActivityIndicator size="large" color={COLORS.verdeClaro} />
+                <Text style={{ color: COLORS.verdeMedio, marginTop: 8, fontWeight: '600' }}>Procesando con IA...</Text>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingHorizontal: 4 }}>
+                <Text style={{ fontSize: 16 }}>💡</Text>
+                <Text style={{ color: '#888', fontSize: 13, lineHeight: 20, flex: 1 }}>Enfoca el cuadro de coordenadas del titulo parcelario</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* ═══ SCREEN: DATOS PARCELA (after polygon defined) ═══ */}
+      {currentScreen === 'datos_parcela' && (
+        <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: COLORS.blanco, zIndex: 303 }}>
+          <View style={{ height: 60, backgroundColor: COLORS.verdePrimario, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 10 : 0 }}>
+            <TouchableOpacity
+              onPress={() => {
+                if (datosParcelaFrom === 'trazar') { setCurrentScreen('trazar'); setCropDrawing(true); setDrawingType('polygon'); }
+                else if (datosParcelaFrom === 'coordenadas') setCurrentScreen('coordenadas');
+                else setCurrentScreen('foto');
+              }}
+              style={{ marginRight: 16 }}
+            >
               <Text style={{ color: '#FFF', fontSize: 18 }}>←</Text>
             </TouchableOpacity>
             <Text style={{ color: '#FFF', fontSize: 18, fontWeight: '700' }}>Datos de parcela</Text>
           </View>
           <ScrollView style={{ flex: 1, padding: 16 }}>
-            <View style={{ backgroundColor: COLORS.verdeSuave, borderRadius: 12, padding: 16, marginBottom: 20 }}>
-              <Text style={{ color: COLORS.verdePrimario, fontSize: 15, fontWeight: '600' }}>📐 Area: {(calcPolygonArea(polygonCoords) / 10000).toFixed(1)} ha   📍 Vertices: {polygonCoords.length}</Text>
+            <View style={{ backgroundColor: COLORS.verdeSuave, borderRadius: 12, padding: 16, marginBottom: 20, flexDirection: 'row', gap: 16 }}>
+              <Text style={{ color: COLORS.verdePrimario, fontSize: 15, fontWeight: '600' }}>📐 Area detectada: {(calcPolygonArea(polygonCoords) / 10000).toFixed(1)} ha</Text>
+              <Text style={{ color: COLORS.verdeMedio, fontSize: 15, fontWeight: '600' }}>📍 Vertices: {polygonCoords.length}</Text>
             </View>
 
-            <Text style={{ fontSize: 16, fontWeight: '700', color: COLORS.negroSuave, marginBottom: 8 }}>Nombre de la parcela</Text>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: COLORS.negroSuave, marginBottom: 8 }}>Nombre de la parcela:</Text>
             <TextInput
               style={{ borderWidth: 1, borderColor: '#DDD', borderRadius: 12, padding: 14, fontSize: 16, color: COLORS.negroSuave, marginBottom: 20, backgroundColor: '#FFF' }}
               placeholder="Mi Parcela..."
@@ -2101,24 +2283,34 @@ _Datos: ESA Copernicus, NASA, USGS_`;
             )}
 
             <TouchableOpacity
-              style={{ backgroundColor: newParcelCultivo ? COLORS.verdeMedio : '#CCC', height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: 8 }}
+              style={{ backgroundColor: newParcelCultivo ? COLORS.verdeMedio : '#CCC', height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: 8, flexDirection: 'row', gap: 8 }}
               disabled={!newParcelCultivo}
               onPress={async () => {
                 const savedCoords = [...polygonCoords];
                 const savedCultivo = newParcelCultivo;
                 const name = newParcelName.trim() || `Parcela ${new Date().toLocaleDateString('es-MX')}`;
-                await guardarParcela(name, savedCoords, savedCultivo);
-                setNewParcelName('');
-                setNewParcelCultivo('');
-                triggerHaptic('success');
-                await cargarParcelas();
-                setCurrentScreen('parcelas');
+                const result = await guardarParcela(name, savedCoords, savedCultivo);
+                if (result) {
+                  setNewParcelName('');
+                  setNewParcelCultivo('');
+                  triggerHaptic('success');
+                  await cargarParcelas();
+                  setCurrentScreen('parcelas');
+                  showToastNotification('✅ Parcela guardada');
+                }
               }}
             >
               <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 17 }}>💾 GUARDAR PARCELA</Text>
             </TouchableOpacity>
             <View style={{ height: 40 }} />
           </ScrollView>
+        </View>
+      )}
+
+      {/* ═══ TOAST NOTIFICATION ═══ */}
+      {showToast && (
+        <View style={{ position: 'absolute', bottom: 110, alignSelf: 'center', backgroundColor: COLORS.verdePrimario, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 30, zIndex: 999, flexDirection: 'row', alignItems: 'center', gap: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 10 }}>
+          <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 15 }}>{toastMsg}</Text>
         </View>
       )}
 
