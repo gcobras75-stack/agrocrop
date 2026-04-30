@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { StyleSheet, View, Text, ActivityIndicator, Platform, TouchableOpacity, Alert, Modal, TextInput, ScrollView, Switch, Share, Animated, Dimensions, Linking } from 'react-native';
+import { StyleSheet, View, Text, ActivityIndicator, Platform, TouchableOpacity, Alert, Modal, TextInput, ScrollView, Switch, Share, Animated, Dimensions, Linking, PanResponder } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import MapView, { Marker, Polygon, Polyline, Region, MapPressEvent } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -145,6 +145,63 @@ export default function AgroCropDashboard() {
   const [showClaudeAnalysis, setShowClaudeAnalysis] = useState(true);
   const [loadingLocation, setLoadingLocation] = useState(true);
 
+  // Panel animation (3 states: expanded/mini/hidden)
+  const { height: screenHeight } = Dimensions.get('window');
+  const PANEL_EXPANDED = screenHeight * 0.62;
+  const PANEL_MINI = 88;
+  const panelAnim = useRef(new Animated.Value(0)).current;
+  const [panelState, setPanelState] = useState<'expanded' | 'mini' | 'hidden'>('hidden');
+
+  const openPanel = useCallback(() => {
+    setPanelState('expanded');
+    Animated.spring(panelAnim, { toValue: PANEL_EXPANDED, useNativeDriver: false, tension: 65, friction: 11 }).start();
+  }, [panelAnim, PANEL_EXPANDED]);
+
+  const togglePanel = useCallback(() => {
+    if (panelState === 'expanded') {
+      setPanelState('mini');
+      Animated.spring(panelAnim, { toValue: PANEL_MINI, useNativeDriver: false }).start();
+    } else if (panelState === 'mini') {
+      setPanelState('hidden');
+      Animated.spring(panelAnim, { toValue: 0, useNativeDriver: false }).start();
+    } else {
+      setPanelState('expanded');
+      Animated.spring(panelAnim, { toValue: PANEL_EXPANDED, useNativeDriver: false, tension: 65, friction: 11 }).start();
+    }
+  }, [panelState, panelAnim, PANEL_EXPANDED, PANEL_MINI]);
+
+  const panResponder = useRef(PanResponder.create({
+    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 10,
+    onPanResponderRelease: (_, g) => {
+      if (g.dy > 50) {
+        // swipe down
+        if (panelState === 'expanded') {
+          setPanelState('mini');
+          Animated.spring(panelAnim, { toValue: PANEL_MINI, useNativeDriver: false }).start();
+        } else {
+          setPanelState('hidden');
+          Animated.spring(panelAnim, { toValue: 0, useNativeDriver: false }).start();
+        }
+      } else if (g.dy < -50) {
+        // swipe up
+        setPanelState('expanded');
+        Animated.spring(panelAnim, { toValue: PANEL_EXPANDED, useNativeDriver: false, tension: 65, friction: 11 }).start();
+      }
+    },
+  })).current;
+
+  // Combined action sheet state
+  const [showActionSheet, setShowActionSheet] = useState(false);
+
+  const getCultivoEmoji = (tipo: string) => {
+    const e: Record<string, string> = { maiz_riego: '🌽', maiz_temporal: '🌾', mango_ataulfo: '🥭', mango_kent: '🥭', mango_tommy: '🥭', tomate: '🍅', chile: '🌶️', aguacate: '🥑', sorgo: '🌾', limon: '🍋' };
+    return e[tipo] || '🌿';
+  };
+  const getNombreCultivo = (tipo: string) => {
+    const n: Record<string, string> = { maiz_riego: 'Maiz Riego', maiz_temporal: 'Maiz Temporal', mango_ataulfo: 'Mango Ataulfo', mango_kent: 'Mango Kent', mango_tommy: 'Mango Tommy', tomate: 'Tomate', chile: 'Chile', aguacate: 'Aguacate', sorgo: 'Sorgo', limon: 'Limon' };
+    return n[tipo] || tipo;
+  };
+
   const sendChatMessage = async () => {
     if (!chatInput.trim() || isTypingChat) return;
     const userMsg = { role: 'user', content: chatInput.trim() };
@@ -174,6 +231,7 @@ export default function AgroCropDashboard() {
     setCropExtended(null);
     setCropExtendedLoading(false);
     setShowCropResults(true);
+    openPanel();
     triggerHaptic('medium');
 
     // Use overrides if provided (from saved parcels), otherwise use current state
@@ -393,7 +451,7 @@ ${(cropData as any).proyeccion ? `
 ━━━━━━━━━━━━━━━━━
 ${mangoSection}
 
-🤖 _Generado con AgroCrop v4.1_
+🤖 _Generado con AgroCrop v4.2_
 _Datos: ESA Copernicus, NASA, USGS_`;
 
       await Share.share({
@@ -1187,7 +1245,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
       <View style={styles.bottomBar}>
         <TouchableOpacity
           style={[styles.bottomBtnPrimary, polygonCoords.length >= 3 && { backgroundColor: '#00C853' }]}
-          onPress={() => {
+          onPress={async () => {
             if (polygonCoords.length >= 3) {
               Alert.alert('¿Que cultivo tienes?', 'Selecciona para analizar', [
                 { text: '🌽 Maiz de riego', onPress: () => startCropAnalysis(polygonCoords, 'maiz_riego') },
@@ -1197,7 +1255,8 @@ _Datos: ESA Copernicus, NASA, USGS_`;
                 { text: 'Cancelar', style: 'cancel' },
               ]);
             } else {
-              setShowCropModal(true);
+              await cargarParcelas();
+              setShowActionSheet(true);
             }
           }}
         >
@@ -1608,34 +1667,58 @@ _Datos: ESA Copernicus, NASA, USGS_`;
         </View>
       </Modal>
 
-      {/* ═══ RESULTS PANEL ═══ */}
+      {/* ═══ FLOATING "VER RESULTADOS" BUTTON (when panel hidden) ═══ */}
+      {panelState === 'hidden' && showCropResults && cropData && !cropAnalyzing && (
+        <TouchableOpacity
+          onPress={openPanel}
+          style={{ position: 'absolute', bottom: 100, right: 16, backgroundColor: COLORS.verdeMedio, borderRadius: 28, paddingHorizontal: 20, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8, zIndex: 999 }}
+        >
+          <Text style={{ fontSize: 18 }}>📊</Text>
+          <View>
+            <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 14 }}>Ver resultados</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11 }}>{cropData.tonelaje_estimado?.toLocaleString()} ton estimadas</Text>
+          </View>
+        </TouchableOpacity>
+      )}
+
+      {/* ═══ ANIMATED RESULTS PANEL ═══ */}
       {showCropResults && (
-        <View style={styles.resultsPanel}>
-          {/* Sticky header */}
-          <View style={styles.resultsHeader}>
-            <Text style={styles.resultsTitle}>🌾 Resultados</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              {cropGridCells.length > 0 && (
-                <TouchableOpacity
-                  style={[styles.resultsHeaderBtn, showCropHeatmap && styles.resultsHeaderBtnActive]}
-                  onPress={() => setShowCropHeatmap(!showCropHeatmap)}
-                >
-                  <MaterialCommunityIcons name="grid" size={14} color={showCropHeatmap ? COLORS.verdeClaro : '#888'} />
-                  <Text style={[styles.resultsHeaderBtnText, showCropHeatmap && { color: COLORS.verdeClaro }]}>Mapa Calor</Text>
-                </TouchableOpacity>
-              )}
-              {cropGridLoading && <ActivityIndicator size="small" color={COLORS.verdeClaro} />}
-              {cropData && (
-                <TouchableOpacity onPress={shareAgroCropResults} style={styles.shareBtn}>
-                  <MaterialCommunityIcons name="share-variant" size={14} color="#FFF" />
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity onPress={() => setShowCropResults(false)}>
-                <MaterialCommunityIcons name="close" size={24} color={COLORS.verdeMedio} />
+        <Animated.View
+          style={{
+            position: 'absolute', bottom: 88, left: 0, right: 0,
+            height: panelAnim,
+            backgroundColor: '#FFF',
+            borderTopLeftRadius: 20, borderTopRightRadius: 20,
+            shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 10,
+            overflow: 'hidden', zIndex: 100,
+          }}
+          {...panResponder.panHandlers}
+        >
+          {/* Handle bar */}
+          <TouchableOpacity onPress={togglePanel} style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 4 }}>
+            <View style={{ width: 40, height: 4, backgroundColor: '#DDD', borderRadius: 2 }} />
+          </TouchableOpacity>
+
+          {/* Mini summary (always visible) */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 8, gap: 8 }}>
+            <Text style={{ flex: 1, fontSize: 13, color: COLORS.verdeMedio, fontWeight: '600' }} numberOfLines={1}>
+              📊 {cropData ? `${cropData.tonelaje_estimado?.toLocaleString()} ton • ${cropData.rendimiento_por_hectarea} t/ha` : cropStep || 'Analizando...'}
+              {cropData?.proyeccion ? ` • ${cropData.proyeccion.fecha_cosecha?.slice(5)} 🔮` : ''}
+            </Text>
+            {cropGridCells.length > 0 && (
+              <TouchableOpacity onPress={() => setShowCropHeatmap(!showCropHeatmap)} style={{ backgroundColor: showCropHeatmap ? COLORS.verdeMedio : '#EEE', borderRadius: 16, paddingHorizontal: 10, paddingVertical: 6 }}>
+                <Text style={{ color: showCropHeatmap ? '#FFF' : '#666', fontSize: 12, fontWeight: '600' }}>🌡️</Text>
               </TouchableOpacity>
-            </View>
+            )}
+            {cropData && (
+              <TouchableOpacity onPress={shareAgroCropResults}><Text style={{ fontSize: 18 }}>📤</Text></TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={togglePanel}>
+              <Text style={{ fontSize: 14, color: '#999' }}>{panelState === 'expanded' ? '▼' : '▲'}</Text>
+            </TouchableOpacity>
           </View>
 
+          {/* Full content (visible when expanded) */}
           <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
             {/* Progress steps */}
             {cropAnalyzing && (
@@ -1844,7 +1927,66 @@ _Datos: ESA Copernicus, NASA, USGS_`;
               </>
             )}
           </ScrollView>
-        </View>
+        </Animated.View>
+      )}
+
+      {/* ═══ COMBINED ACTION SHEET ═══ */}
+      {showActionSheet && (
+        <TouchableOpacity style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 200 }} activeOpacity={1} onPress={() => setShowActionSheet(false)}>
+          <View style={{ position: 'absolute', bottom: 88, left: 0, right: 0, backgroundColor: '#FFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 20 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.negroSuave }}>¿Que quieres analizar?</Text>
+              <TouchableOpacity onPress={() => setShowActionSheet(false)}><Text style={{ fontSize: 20, color: '#999' }}>✕</Text></TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 11, fontWeight: '600', color: '#999', textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 }}>Nueva parcela</Text>
+
+            {[
+              { icon: '✏️', titulo: 'Dibujar en el mapa', sub: 'Traza el contorno con precisión', action: 'draw' as const },
+              { icon: '📍', titulo: 'Escribir coordenadas', sub: 'Ingresa los puntos GPS', action: 'coords' as const },
+              { icon: '📸', titulo: 'Foto del titulo', sub: 'La IA extrae las coordenadas', action: 'photo' as const },
+            ].map(opt => (
+              <TouchableOpacity key={opt.action} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 14 }} onPress={() => {
+                setShowActionSheet(false);
+                if (opt.action === 'draw') startCropDrawMode();
+                else if (opt.action === 'coords') { setCropAreaMode('coords'); setShowCropModal(true); }
+                else { setShowPhotoOptions(true); }
+              }}>
+                <Text style={{ fontSize: 24, width: 36, textAlign: 'center' }}>{opt.icon}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '500', color: COLORS.negroSuave }}>{opt.titulo}</Text>
+                  <Text style={{ fontSize: 13, color: '#999', marginTop: 1 }}>{opt.sub}</Text>
+                </View>
+                <Text style={{ color: '#CCC', fontSize: 18 }}>›</Text>
+              </TouchableOpacity>
+            ))}
+
+            {savedParcelas.length > 0 && (
+              <>
+                <View style={{ height: 1, backgroundColor: '#F0F0F0', marginHorizontal: 16, marginTop: 8 }} />
+                <Text style={{ fontSize: 11, fontWeight: '600', color: '#999', textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 }}>Parcelas guardadas</Text>
+                {savedParcelas.slice(0, 4).map(parcela => (
+                  <TouchableOpacity key={parcela.id} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 14 }} onPress={() => {
+                    setShowActionSheet(false);
+                    startCropAnalysis(parcela.coordenadas, parcela.tipo_cultivo);
+                  }}>
+                    <Text style={{ fontSize: 24, width: 36, textAlign: 'center' }}>{getCultivoEmoji(parcela.tipo_cultivo)}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15, fontWeight: '500', color: COLORS.negroSuave }}>{parcela.nombre}</Text>
+                      <Text style={{ fontSize: 12, color: '#999', marginTop: 1 }}>{parcela.hectareas} ha  {getNombreCultivo(parcela.tipo_cultivo)}</Text>
+                    </View>
+                    <Text style={{ color: COLORS.verdeClaro, fontWeight: '600', fontSize: 13 }}>Analizar ›</Text>
+                  </TouchableOpacity>
+                ))}
+                {savedParcelas.length > 4 && (
+                  <TouchableOpacity style={{ paddingHorizontal: 16, paddingVertical: 10 }} onPress={() => { setShowActionSheet(false); setShowParcelasModal(true); }}>
+                    <Text style={{ color: COLORS.verdeMedio, fontSize: 14, fontWeight: '500' }}>Ver todas ({savedParcelas.length}) →</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
+          </View>
+        </TouchableOpacity>
       )}
 
     </View>
