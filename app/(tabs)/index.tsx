@@ -56,6 +56,22 @@ function calcPolygonArea(coords: Coordinate[]): number {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Crop selection tree (2-level: main category → sub-variety)
+// ─────────────────────────────────────────────────────────────────────────────
+
+type CropVariant = { key: string; label: string };
+type CropEntry   = { emoji: string; label: string; direct?: string; variants?: CropVariant[] };
+const CROP_TREE: Record<string, CropEntry> = {
+  maiz:     { emoji: '🌽', label: 'Maíz',     variants: [{ key: 'maiz_riego',    label: 'Riego' },    { key: 'maiz_temporal', label: 'Temporal' }] },
+  mango:    { emoji: '🥭', label: 'Mango',    variants: [{ key: 'mango_ataulfo', label: 'Ataulfo\n(Manila)' }, { key: 'mango_kent',    label: 'Kent' }, { key: 'mango_tommy',   label: 'Tommy\nAtkins' }, { key: 'mango_ataulfo', label: 'Haden' }, { key: 'mango_ataulfo', label: 'Otro tipo' }] },
+  tomate:   { emoji: '🍅', label: 'Tomate',   direct: 'tomate' },
+  chile:    { emoji: '🌶️', label: 'Chile',    variants: [{ key: 'chile',    label: 'Jalapeño' }, { key: 'chile',    label: 'Bell' },     { key: 'chile',    label: 'Habanero' }, { key: 'chile',    label: 'Otro' }] },
+  aguacate: { emoji: '🥑', label: 'Aguacate', variants: [{ key: 'aguacate', label: 'Hass' },     { key: 'aguacate', label: 'Criollo' }, { key: 'aguacate', label: 'Otro' }] },
+  sorgo:    { emoji: '🌾', label: 'Sorgo',    variants: [{ key: 'sorgo',    label: 'Forrajero' }, { key: 'sorgo',    label: 'Grano' }] },
+  limon:    { emoji: '🍋', label: 'Limón',    variants: [{ key: 'limon',    label: 'Persa' },     { key: 'limon',    label: 'Italiano' }, { key: 'limon',    label: 'Otro' }] },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function AgroCropDashboard() {
   const mapRef = useRef<MapView>(null);
@@ -137,6 +153,8 @@ export default function AgroCropDashboard() {
   const [showSavePolygonModal, setShowSavePolygonModal] = useState(false);
   const [newParcelName, setNewParcelName] = useState('');
   const [newParcelCultivo, setNewParcelCultivo] = useState('');
+  const [cultivoPrincipal, setCultivoPrincipal] = useState('');   // 'maiz' | 'mango' | etc.
+  const [selectedVariantLabel, setSelectedVariantLabel] = useState(''); // for highlight
 
   // NEW: Persistent saved parcels
   const [savedParcelas, setSavedParcelas] = useState<any[]>([]);
@@ -1414,22 +1432,63 @@ _Datos: ESA Copernicus, NASA, USGS_`;
                 onChangeText={setNewParcelName}
               />
 
-              <Text style={{ fontWeight: '700', color: COLORS.negroSuave, marginLeft: 16 }}>Tipo de cultivo</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 16, paddingTop: 8 }}>
-                {['maiz_riego', 'maiz_temporal', 'mango_ataulfo', 'mango_kent', 'mango_tommy', 'tomate', 'chile', 'aguacate', 'sorgo', 'limon'].map(cultivo => (
-                  <TouchableOpacity
-                    key={cultivo}
-                    onPress={() => setNewParcelCultivo(cultivo)}
-                    style={{
-                      paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-                      backgroundColor: newParcelCultivo === cultivo ? COLORS.verdeClaro : '#F0F0F0',
-                      borderWidth: 1,
-                      borderColor: newParcelCultivo === cultivo ? COLORS.verdeMedio : '#DDD',
-                    }}
-                  >
-                    <Text style={{ color: newParcelCultivo === cultivo ? '#FFF' : '#555', fontWeight: '600', fontSize: 13 }}>{cultivo.replace('_', ' ')}</Text>
-                  </TouchableOpacity>
-                ))}
+              <Text style={{ fontWeight: '700', color: COLORS.negroSuave, marginLeft: 16, marginBottom: 8 }}>
+                {cultivoPrincipal
+                  ? `${CROP_TREE[cultivoPrincipal]?.emoji} ¿Variedad de ${CROP_TREE[cultivoPrincipal]?.label.toLowerCase()}?`
+                  : 'Tipo de cultivo'}
+              </Text>
+              <View style={{ paddingHorizontal: 16 }}>
+                {/* Level 1 */}
+                {!cultivoPrincipal && (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    {Object.entries(CROP_TREE).map(([id, crop]) => (
+                      <TouchableOpacity
+                        key={id}
+                        onPress={() => {
+                          setCultivoPrincipal(id);
+                          setSelectedVariantLabel('');
+                          if (crop.direct) { setNewParcelCultivo(crop.direct); } else { setNewParcelCultivo(''); }
+                        }}
+                        style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: '#DDD', flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                      >
+                        <Text style={{ fontSize: 16 }}>{crop.emoji}</Text>
+                        <Text style={{ color: '#555', fontWeight: '600', fontSize: 13 }}>{crop.label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+                {/* Level 2 — variants */}
+                {!!cultivoPrincipal && !!CROP_TREE[cultivoPrincipal]?.variants && (
+                  <View>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+                      {CROP_TREE[cultivoPrincipal].variants!.map((v) => {
+                        const active = selectedVariantLabel === v.label;
+                        return (
+                          <TouchableOpacity
+                            key={v.label}
+                            onPress={() => { setSelectedVariantLabel(v.label); setNewParcelCultivo(v.key); }}
+                            style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: active ? COLORS.verdeClaro : '#F0F0F0', borderWidth: 1, borderColor: active ? COLORS.verdeMedio : '#DDD' }}
+                          >
+                            <Text style={{ color: active ? '#FFF' : '#555', fontWeight: '600', fontSize: 13 }}>{CROP_TREE[cultivoPrincipal].emoji} {v.label}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                    <TouchableOpacity onPress={() => { setCultivoPrincipal(''); setSelectedVariantLabel(''); setNewParcelCultivo(''); }}>
+                      <Text style={{ color: '#888', fontSize: 13 }}>← Cambiar cultivo</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                {/* Level 2 — direct confirm */}
+                {!!cultivoPrincipal && !!CROP_TREE[cultivoPrincipal]?.direct && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ fontSize: 18 }}>{CROP_TREE[cultivoPrincipal].emoji}</Text>
+                    <Text style={{ color: COLORS.verdeMedio, fontWeight: '700', fontSize: 14, flex: 1 }}>{CROP_TREE[cultivoPrincipal].label} ✓</Text>
+                    <TouchableOpacity onPress={() => { setCultivoPrincipal(''); setNewParcelCultivo(''); }}>
+                      <Text style={{ color: '#888', fontSize: 13 }}>← Cambiar</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
 
               {(newParcelName.length > 0 && newParcelName.length < 3) && (
@@ -1449,6 +1508,8 @@ _Datos: ESA Copernicus, NASA, USGS_`;
                     setShowSavePolygonModal(false);
                     setNewParcelName('');
                     setNewParcelCultivo('');
+                    setCultivoPrincipal('');
+                    setSelectedVariantLabel('');
                     triggerHaptic('success');
                     Alert.alert('Parcela guardada', `"${result.nombre}" guardada con ${savedCoords.length} vertices.`);
                   }
@@ -1471,6 +1532,8 @@ _Datos: ESA Copernicus, NASA, USGS_`;
                   setShowSavePolygonModal(false);
                   setNewParcelName('');
                   setNewParcelCultivo('');
+                  setCultivoPrincipal('');
+                  setSelectedVariantLabel('');
                   triggerHaptic('success');
                   startCropAnalysis(savedCoords, savedCultivo);
                 }}
@@ -2251,32 +2314,71 @@ _Datos: ESA Copernicus, NASA, USGS_`;
               onChangeText={setNewParcelName}
             />
 
-            <Text style={{ fontSize: 16, fontWeight: '700', color: COLORS.negroSuave, marginBottom: 12 }}>¿Que cultivo tienes?</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 8 }}>
-              {[
-                { key: 'maiz_riego', emoji: '🌽', label: 'Maiz\nRiego' },
-                { key: 'maiz_temporal', emoji: '🌾', label: 'Maiz\nTemp.' },
-                { key: 'mango_ataulfo', emoji: '🥭', label: 'Mango' },
-                { key: 'tomate', emoji: '🍅', label: 'Tomate' },
-                { key: 'chile', emoji: '🌶️', label: 'Chile' },
-                { key: 'aguacate', emoji: '🥑', label: 'Aguac.' },
-                { key: 'sorgo', emoji: '🌾', label: 'Sorgo' },
-                { key: 'limon', emoji: '🍋', label: 'Limon' },
-              ].map(c => (
+            {/* ── Crop selector — 2-level ── */}
+            <Text style={{ fontSize: 16, fontWeight: '700', color: COLORS.negroSuave, marginBottom: 12 }}>
+              {cultivoPrincipal
+                ? `${CROP_TREE[cultivoPrincipal]?.emoji} ¿Qué variedad de ${CROP_TREE[cultivoPrincipal]?.label.toLowerCase()}?`
+                : '¿Qué cultivo tienes?'}
+            </Text>
+
+            {/* Level 1: main categories */}
+            {!cultivoPrincipal && (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 8 }}>
+                {Object.entries(CROP_TREE).map(([id, crop]) => (
+                  <TouchableOpacity
+                    key={id}
+                    onPress={() => {
+                      setCultivoPrincipal(id);
+                      setSelectedVariantLabel('');
+                      if (crop.direct) { setNewParcelCultivo(crop.direct); } else { setNewParcelCultivo(''); }
+                      triggerHaptic('light');
+                    }}
+                    style={{ width: '30%', aspectRatio: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8F8F8', borderWidth: 2, borderColor: '#EEE' }}
+                  >
+                    <Text style={{ fontSize: 28 }}>{crop.emoji}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#888', marginTop: 4, textAlign: 'center' }}>{crop.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {/* Level 2a: sub-varieties */}
+            {!!cultivoPrincipal && !!CROP_TREE[cultivoPrincipal]?.variants && (
+              <View style={{ marginBottom: 8 }}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+                  {CROP_TREE[cultivoPrincipal].variants!.map((v) => {
+                    const active = selectedVariantLabel === v.label;
+                    return (
+                      <TouchableOpacity
+                        key={v.label}
+                        onPress={() => { setSelectedVariantLabel(v.label); setNewParcelCultivo(v.key); triggerHaptic('light'); }}
+                        style={{ width: '30%', aspectRatio: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: active ? COLORS.verdeSuave : '#F8F8F8', borderWidth: 2, borderColor: active ? COLORS.verdeClaro : '#EEE' }}
+                      >
+                        <Text style={{ fontSize: 26 }}>{CROP_TREE[cultivoPrincipal].emoji}</Text>
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: active ? COLORS.verdeMedio : '#888', marginTop: 4, textAlign: 'center' }}>{v.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
                 <TouchableOpacity
-                  key={c.key}
-                  onPress={() => setNewParcelCultivo(c.key)}
-                  style={{
-                    width: '30%', aspectRatio: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
-                    backgroundColor: newParcelCultivo === c.key ? COLORS.verdeSuave : '#F8F8F8',
-                    borderWidth: 2, borderColor: newParcelCultivo === c.key ? COLORS.verdeClaro : '#EEE',
-                  }}
+                  onPress={() => { setCultivoPrincipal(''); setSelectedVariantLabel(''); setNewParcelCultivo(''); triggerHaptic('light'); }}
+                  style={{ alignSelf: 'flex-start', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, borderColor: '#DDD', backgroundColor: '#F8F8F8' }}
                 >
-                  <Text style={{ fontSize: 28 }}>{c.emoji}</Text>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: newParcelCultivo === c.key ? COLORS.verdeMedio : '#888', marginTop: 4, textAlign: 'center' }}>{c.label}</Text>
+                  <Text style={{ color: '#666', fontSize: 14 }}>← Cambiar cultivo</Text>
                 </TouchableOpacity>
-              ))}
-            </View>
+              </View>
+            )}
+
+            {/* Level 2b: direct select confirmation */}
+            {!!cultivoPrincipal && !!CROP_TREE[cultivoPrincipal]?.direct && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12, padding: 14, backgroundColor: COLORS.verdeSuave, borderRadius: 12, borderWidth: 2, borderColor: COLORS.verdeClaro }}>
+                <Text style={{ fontSize: 28 }}>{CROP_TREE[cultivoPrincipal].emoji}</Text>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: COLORS.verdeMedio, flex: 1 }}>{CROP_TREE[cultivoPrincipal].label} ✓</Text>
+                <TouchableOpacity onPress={() => { setCultivoPrincipal(''); setNewParcelCultivo(''); }}>
+                  <Text style={{ color: '#888', fontSize: 13 }}>← Cambiar</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {!newParcelCultivo && (
               <Text style={{ color: COLORS.amarilloMaiz, fontSize: 13, marginBottom: 16 }}>⚠️ Selecciona el cultivo (requerido para analizar)</Text>
@@ -2293,6 +2395,8 @@ _Datos: ESA Copernicus, NASA, USGS_`;
                 if (result) {
                   setNewParcelName('');
                   setNewParcelCultivo('');
+                  setCultivoPrincipal('');
+                  setSelectedVariantLabel('');
                   triggerHaptic('success');
                   await cargarParcelas();
                   setCurrentScreen('parcelas');

@@ -13,12 +13,23 @@
     "preview": {
       "distribution": "internal",
       "channel": "preview",
-      "ios": { "buildConfiguration": "Release" }
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release"
+      }
     },
     "production": {
       "distribution": "store",
       "channel": "production",
-      "ios": { "buildConfiguration": "Release" }
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "ios": {
+        "buildConfiguration": "Release"
+      }
     }
   },
   "submit": {

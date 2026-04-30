@@ -8,20 +8,24 @@
     "scheme": "agrocrop",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "platforms": ["ios", "android"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.ecapro.agrocrop",
+      "buildNumber": "1",
       "config": {
         "usesNonExemptEncryption": false
       },
       "infoPlist": {
-        "NSCameraUsageDescription": "Permite escanear rocas con la IA usando los lentes macro y filtros UV.",
-        "NSPhotoLibraryUsageDescription": "Permite analizar muestras guardadas en la galería.",
-        "NSLocationWhenInUseUsageDescription": "Permite registrar las coordenadas geológicas exactas de la muestra recolectada.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Permite monitorear tu ubicación en el terreno para el mapa de calor mineral."
+        "NSCameraUsageDescription": "AgroCrop necesita la cámara para fotografiar los títulos parcelarios.",
+        "NSPhotoLibraryUsageDescription": "AgroCrop necesita acceso a tus fotos para leer los títulos parcelarios.",
+        "NSLocationWhenInUseUsageDescription": "AgroCrop necesita tu ubicación para centrar el mapa en tu parcela.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "AgroCrop necesita tu ubicación para centrar el mapa en tu parcela."
       }
     },
     "android": {
+      "package": "com.ecapro.agrocrop",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -31,9 +35,13 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "permissions": [
-        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.INTERNET",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -59,14 +67,14 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Permite cargar evidencias.",
-          "cameraPermission": "Permite realizar capturas crudas en campo para pasar por el filtro IA."
+          "photosPermission": "AgroCrop necesita acceso a tus fotos para leer los títulos parcelarios.",
+          "cameraPermission": "AgroCrop necesita la cámara para fotografiar los títulos parcelarios."
         }
       ],
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Requerido para el trazado de prospección en altitud."
+          "locationAlwaysAndWhenInUsePermission": "AgroCrop necesita tu ubicación para centrar el mapa en tu parcela."
         }
       ]
     ],
