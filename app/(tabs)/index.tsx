@@ -406,7 +406,7 @@ export default function AgroCropDashboard() {
       setShowCropResults(true);
 
       // 4. Build message
-      const imgMonth = parseInt(cropData.fecha_imagen.split('-')[1], 10);
+      const imgMonth = parseInt((cropData.imagen_mas_reciente_global ?? cropData.fecha_fin).split('-')[1], 10);
       const etapa = (imgMonth >= 10 && imgMonth <= 11) ? 'Siembra' : (imgMonth === 12 || imgMonth === 1) ? 'Desarrollo vegetativo' : (imgMonth === 2 || imgMonth === 3) ? 'Floracion/Llenado de grano' : 'Madurez/Cosecha';
       const precision = (imgMonth === 2 || imgMonth === 3) ? 'Alta' : (imgMonth === 12 || imgMonth === 1) ? 'Media' : 'Baja';
       const areaKm2Share = Math.round(Math.PI * cropRadioKm * cropRadioKm).toLocaleString();
@@ -423,7 +423,7 @@ export default function AgroCropDashboard() {
 
       const msg = `${cropEmoji} *ANALISIS ${cropData.tipo_cultivo_label?.toUpperCase() || 'BIOMASA'} - SINALOA*
 📅 Analisis: ${hoy}
-🛰️ Imagen satelital: ${cropData.fecha_imagen} (Sentinel-2)
+🛰️ Imagen satelital: ${cropData.imagen_mas_reciente_global ?? ''} (${cropData.frescura?.satelite_mas_reciente ?? 'S2'})
 📍 Centro: 24.3994°N, 107.1714°W
 📏 Radio analizado: ${cropRadioKm}km
 📐 Area total: ${areaKm2Share} km2
@@ -474,7 +474,7 @@ ${(cropData as any).proyeccion ? `
 ━━━━━━━━━━━━━━━━━
 ${mangoSection}
 
-🤖 _Generado con AgroCrop v4.3_
+🤖 _Generado con AgroCrop v4.7_
 _Datos: ESA Copernicus, NASA, USGS_`;
 
       await Share.share({
@@ -1781,17 +1781,44 @@ _Datos: ESA Copernicus, NASA, USGS_`;
             {/* Results */}
             {cropData && !cropAnalyzing && (
               <>
-                {/* Freshness card */}
-                <View style={[styles.freshnessCard, { borderColor: (cropData.frescura_dias ?? 99) <= 7 ? COLORS.verdeClaro : (cropData.frescura_dias ?? 99) <= 14 ? COLORS.amarilloMaiz : (cropData.frescura_dias ?? 99) <= 30 ? COLORS.amarilloMango : COLORS.rojo }]}>
-                  <View>
-                    <Text style={styles.freshnessDate}>{cropData.fecha_imagen} <Text style={styles.freshnessAgo}>(hace {cropData.frescura_dias ?? '?'}d)</Text></Text>
-                    <Text style={styles.freshnessSource}>Sentinel-2 | {(cropData as any).metodo_composicion ? 'Top-3 recientes' : 'Mediana'}</Text>
-                  </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={[styles.freshnessConf, { color: (cropData.frescura_dias ?? 99) <= 7 ? COLORS.verdeClaro : (cropData.frescura_dias ?? 99) <= 14 ? COLORS.amarilloMaiz : COLORS.amarilloMango }]}>{(cropData as any).confianza_temporal || 'Buena'}</Text>
-                    <Text style={styles.freshnessMargin}>{(cropData as any).margen_incertidumbre || '±15%'}</Text>
-                  </View>
-                </View>
+                {/* Freshness card — multi-satellite */}
+                {(() => {
+                  const frescuraDias = cropData.frescura_dias ?? 99;
+                  const calidad = cropData.confianza_temporal || 'Buena';
+                  const borderColor = frescuraDias <= 7 ? COLORS.verdeClaro : frescuraDias <= 14 ? COLORS.amarilloMaiz : frescuraDias <= 30 ? COLORS.amarilloMango : COLORS.rojo;
+                  const satRows: { id: 'S2' | 'L9' | 'S1'; label: string }[] = [
+                    { id: 'S2', label: 'Sentinel-2' },
+                    { id: 'L9', label: 'Landsat 9' },
+                    { id: 'S1', label: 'SAR Radar' },
+                  ];
+                  return (
+                    <View style={[styles.freshnessCard, { borderColor }]}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <Text style={styles.freshnessTitle}>COBERTURA SATELITAL</Text>
+                        <View style={[styles.freshnessBadge, { backgroundColor: borderColor + '22' }]}>
+                          <Text style={[styles.freshnessBadgeText, { color: borderColor }]}>{calidad}</Text>
+                        </View>
+                      </View>
+                      {satRows.map(({ id, label }) => {
+                        const info = cropData.frescura?.por_satelite?.[id];
+                        const d = info?.dias_atras;
+                        const isMostRecent = cropData.frescura?.satelite_mas_reciente === id;
+                        const dotColor = d == null ? '#CCC' : d <= 7 ? COLORS.verdeClaro : d <= 14 ? COLORS.amarilloMaiz : d <= 30 ? COLORS.amarilloMango : COLORS.rojo;
+                        return (
+                          <View key={id} style={[styles.freshnessRow, isMostRecent && { backgroundColor: dotColor + '11' }]}>
+                            <Text style={[styles.freshnessSatId, { color: dotColor }]}>{id}</Text>
+                            <Text style={styles.freshnessSatLabel}>{label}</Text>
+                            <Text style={styles.freshnessDateSmall}>{info?.fecha || '—'}</Text>
+                            <View style={[styles.freshnessDayBadge, { backgroundColor: d != null ? dotColor + '22' : '#EEE' }]}>
+                              <Text style={[styles.freshnessDayText, { color: d != null ? dotColor : '#999' }]}>{d != null ? `${d}d` : '—'}{isMostRecent ? ' ★' : ''}</Text>
+                            </View>
+                          </View>
+                        );
+                      })}
+                      <Text style={styles.freshnessMargin}>{(cropData as any).margen_incertidumbre || '±15%'} incertidumbre · pixel-mosaic</Text>
+                    </View>
+                  );
+                })()}
 
                 {/* Production card */}
                 <View style={styles.productionCard}>
@@ -2777,14 +2804,21 @@ const styles = StyleSheet.create({
 
   // Freshness
   freshnessCard: {
-    backgroundColor: '#F9F9F9', borderRadius: 12, padding: 14, marginBottom: 10,
-    borderWidth: 2, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: '#F9F9F9', borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 2,
   },
-  freshnessDate: { color: '#333', fontSize: 13, fontWeight: '600' },
-  freshnessAgo: { color: '#999', fontWeight: '400' },
-  freshnessSource: { color: '#999', fontSize: 11, marginTop: 2 },
-  freshnessConf: { fontSize: 12, fontWeight: '700' },
-  freshnessMargin: { color: '#999', fontSize: 10, marginTop: 1 },
+  freshnessTitle: { color: '#666', fontSize: 10, fontWeight: '700', letterSpacing: 0.8 },
+  freshnessBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
+  freshnessBadgeText: { fontSize: 11, fontWeight: '700' },
+  freshnessRow: {
+    flexDirection: 'row', alignItems: 'center', paddingVertical: 4,
+    borderRadius: 6, paddingHorizontal: 4, marginBottom: 2,
+  },
+  freshnessSatId: { fontSize: 11, fontWeight: '800', width: 24 },
+  freshnessSatLabel: { color: '#555', fontSize: 11, flex: 1 },
+  freshnessDateSmall: { color: '#888', fontSize: 11, marginRight: 6 },
+  freshnessDayBadge: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 },
+  freshnessDayText: { fontSize: 11, fontWeight: '700' },
+  freshnessMargin: { color: '#999', fontSize: 10, marginTop: 6 },
 
   // Production
   productionCard: {

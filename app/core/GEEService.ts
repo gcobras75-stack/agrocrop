@@ -481,6 +481,19 @@ export interface BiomassAnalysisResult {
   etapa_fenologica?: string;
   margen_incertidumbre?: string;
   metodo_composicion?: string;
+  frescura?: {
+    fecha_imagen: string;
+    satelite_mas_reciente: string;
+    dias_atras: number;
+    calidad: string;
+    num_imagenes_usadas: number;
+    ventana_dias: number;
+    por_satelite: {
+      S2: { fecha: string; dias_atras: number | null; imagenes: number };
+      L9: { fecha: string; dias_atras: number | null; imagenes: number };
+      S1: { fecha: string; dias_atras: number | null; imagenes: number };
+    };
+  };
   proyeccion?: {
     ton_ha: number;
     tonelaje_proyectado: number;

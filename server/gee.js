@@ -970,7 +970,7 @@ async function getBiomassAnalysis({ coordinates, fecha_inicio, fecha_fin, tipo_c
     const col = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
       .filterDate(sd, fecha_fin)
       .filterBounds(geometry)
-      .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 10))
+      .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30))
       .map(function(img) {
         var scl = img.select('SCL');
         var mask = scl.neq(3).and(scl.neq(8)).and(scl.neq(9)).and(scl.neq(10)).and(scl.neq(11));
@@ -1003,9 +1003,8 @@ async function getBiomassAnalysis({ coordinates, fecha_inicio, fecha_fin, tipo_c
     throw new Error('No se encontraron imágenes Sentinel-2 sin nubes en los últimos 90 días. Intenta un área con menos nubosidad.');
   }
 
-  // ── Build S2 composite from top 3 most recent cloud-free images ────────
-  const s2Sorted = s2.sort('system:time_start', false);
-  const s2Composite = s2Sorted.limit(5).qualityMosaic('B8'); // best NIR pixel from top 5
+  // ── Pixel-based composite: most recent cloud-free pixel per location ───
+  const s2Composite = s2.sort('system:time_start', false).mosaic(); // most recent valid pixel
   const NDVI = s2Composite.normalizedDifference(['B8', 'B4']).rename('NDVI');
   const EVI = s2Composite.expression(
     '2.5 * ((NIR - RED) / (NIR + 6*RED - 7.5*BLUE + 1))',
@@ -1024,12 +1023,25 @@ async function getBiomassAnalysis({ coordinates, fecha_inicio, fecha_fin, tipo_c
   // ── Parallel satellite fetches: Landsat + SAR (Promise.allSettled) ─────
   const fetchLandsat = async () => {
     try {
+      // 30-day window — L9 revisits every 16 days, wider window ensures coverage
+      const lsStart = new Date(now.getTime() - 30 * 86400000).toISOString().split('T')[0];
+      const maskL9 = (img) => {
+        var qa = img.select('QA_PIXEL');
+        // Bit 3 = cloud, Bit 4 = cloud shadow, Bit 1 = dilated cloud
+        var cloudMask = qa.bitwiseAnd(1 << 3).eq(0)
+          .and(qa.bitwiseAnd(1 << 4).eq(0))
+          .and(qa.bitwiseAnd(1 << 1).eq(0));
+        return img.updateMask(cloudMask)
+          .select(['SR_B4', 'SR_B5'], ['RED', 'NIR'])
+          .multiply(0.0000275).add(-0.2)
+          .copyProperties(img, ['system:time_start']);
+      };
       const l9 = ee.ImageCollection('LANDSAT/LC09/C02/T1_L2')
-        .filterDate(s2StartDate, fecha_fin).filterBounds(geometry)
-        .filter(ee.Filter.lt('CLOUD_COVER', 15));
+        .filterDate(lsStart, fecha_fin).filterBounds(geometry)
+        .filter(ee.Filter.lt('CLOUD_COVER', 30)).map(maskL9);
       const l8 = ee.ImageCollection('LANDSAT/LC08/C02/T1_L2')
-        .filterDate(s2StartDate, fecha_fin).filterBounds(geometry)
-        .filter(ee.Filter.lt('CLOUD_COVER', 15));
+        .filterDate(lsStart, fecha_fin).filterBounds(geometry)
+        .filter(ee.Filter.lt('CLOUD_COVER', 30)).map(maskL9);
       const landsat = l9.merge(l8).sort('system:time_start', false);
       const lsCount = await getInfoAsync(landsat.size());
       if (!lsCount) return { count: 0, date: 'N/A' };
@@ -1042,8 +1054,10 @@ async function getBiomassAnalysis({ coordinates, fecha_inicio, fecha_fin, tipo_c
 
   const fetchSAR = async () => {
     try {
+      // SAR penetrates clouds — 12-day window always gets recent data (S1 revisit = 6 days)
+      const sarStart = new Date(now.getTime() - 12 * 86400000).toISOString().split('T')[0];
       const s1 = ee.ImageCollection('COPERNICUS/S1_GRD')
-        .filterDate(s2StartDate, fecha_fin).filterBounds(geometry)
+        .filterDate(sarStart, fecha_fin).filterBounds(geometry)
         .filter(ee.Filter.eq('instrumentMode', 'IW'))
         .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV'))
         .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VH'))
@@ -1256,20 +1270,38 @@ async function getBiomassAnalysis({ coordinates, fecha_inicio, fecha_fin, tipo_c
     console.log(`[biomass] ERA5: temp=${climaLocal.temp_max_c}C, precip=${climaLocal.precip_mm}mm`);
   } catch (e) { console.log('[biomass] ERA5 failed:', e.message); }
 
-  // ── Frescura extendida ──────────────────────────────────────────────────
-  const frescuraDias = Math.max(0, Math.round((Date.now() - new Date(s2Info.date).getTime()) / 86400000));
+  // ── Frescura multi-satélite ─────────────────────────────────────────────
+  const parseDateMs = (d) => (d && d !== 'N/A') ? new Date(d).getTime() : 0;
+  const fechasSatelites = [
+    { sat: 'S2', date: s2Info.date },
+    { sat: 'L9', date: landsatInfo.date },
+    { sat: 'S1', date: sarInfo.date },
+  ].filter(x => x.date && x.date !== 'N/A');
+
+  const masReciente = fechasSatelites.reduce(
+    (best, cur) => parseDateMs(cur.date) > parseDateMs(best.date) ? cur : best,
+    { sat: 'N/A', date: fecha_fin }
+  );
+
+  const diasAtrasS2 = s2Info.date !== 'N/A' ? Math.max(0, Math.round((Date.now() - parseDateMs(s2Info.date)) / 86400000)) : null;
+  const diasAtrasL9 = landsatInfo.date !== 'N/A' ? Math.max(0, Math.round((Date.now() - parseDateMs(landsatInfo.date)) / 86400000)) : null;
+  const diasAtrasS1 = sarInfo.date !== 'N/A' ? Math.max(0, Math.round((Date.now() - parseDateMs(sarInfo.date)) / 86400000)) : null;
+
+  const frescuraDias = Math.max(0, Math.round((Date.now() - parseDateMs(masReciente.date)) / 86400000));
   const calidadFrescura = frescuraDias <= 7 ? 'Excelente' : frescuraDias <= 14 ? 'Buena' : frescuraDias <= 30 ? 'Aceptable' : 'Desactualizada';
-  const coberturaEstimada = s2Info.count > 0
-    ? Math.max(0, Math.min(100, Math.round(100 - (s2Info.count < 3 ? 20 : 0))))
-    : 0;
 
   const frescura = {
-    fecha_imagen: s2Info.date,
+    fecha_imagen: masReciente.date,
+    satelite_mas_reciente: masReciente.sat,
     dias_atras: frescuraDias,
     calidad: calidadFrescura,
     num_imagenes_usadas: s2Info.count,
     ventana_dias: s2WindowDays,
-    cobertura_nubes_pct: coberturaEstimada,
+    por_satelite: {
+      S2: { fecha: s2Info.date,       dias_atras: diasAtrasS2, imagenes: s2Info.count },
+      L9: { fecha: landsatInfo.date,  dias_atras: diasAtrasL9, imagenes: landsatInfo.count },
+      S1: { fecha: sarInfo.date,      dias_atras: diasAtrasS1, imagenes: sarInfo.count },
+    },
   };
 
   // Satélites activos para este cultivo
@@ -1328,13 +1360,14 @@ async function getBiomassAnalysis({ coordinates, fecha_inicio, fecha_fin, tipo_c
       sentinel1_sar: { fecha: sarInfo.date, imagenes: sarInfo.count, rvi: sarInfo.rvi },
     },
     clima_local: climaLocal,
-    imagen_mas_reciente_global: s2Info.date,
+    imagen_mas_reciente_global: masReciente.date,
+    fecha_imagen: masReciente.date,           // backward compat alias
     frescura_dias: frescuraDias,
     confianza_temporal: calidadFrescura,
     etapa_fenologica: etapaLabel,
     margen_incertidumbre: `±${Math.round(margen * 100)}%`,
-    metodo_composicion: 'qualityMosaic top-5 NIR (imagen más reciente)',
-    confianza_fusion: `Sentinel-2 — ${calidadFrescura}`,
+    metodo_composicion: 'pixel-mosaic most-recent (S2+L9+S1)',
+    confianza_fusion: `${masReciente.sat} — ${calidadFrescura}`,
   };
 }
 
