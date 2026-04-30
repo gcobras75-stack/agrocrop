@@ -21,6 +21,14 @@
         "buildConfiguration": "Release"
       }
     },
+    "preview-sim": {
+      "distribution": "internal",
+      "channel": "preview",
+      "ios": {
+        "simulator": true,
+        "buildConfiguration": "Release"
+      }
+    },
     "production": {
       "distribution": "store",
       "channel": "production",
