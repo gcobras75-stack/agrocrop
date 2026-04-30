@@ -143,6 +143,7 @@ export default function AgroCropDashboard() {
 
   // NEW: Claude analysis collapsible
   const [showClaudeAnalysis, setShowClaudeAnalysis] = useState(true);
+  const [loadingLocation, setLoadingLocation] = useState(true);
 
   const sendChatMessage = async () => {
     if (!chatInput.trim() || isTypingChat) return;
@@ -392,7 +393,7 @@ ${(cropData as any).proyeccion ? `
 ━━━━━━━━━━━━━━━━━
 ${mangoSection}
 
-🤖 _Generado con AgroCrop v3.1_
+🤖 _Generado con AgroCrop v3.2_
 _Datos: ESA Copernicus, NASA, USGS_`;
 
       await Share.share({
@@ -750,11 +751,13 @@ _Datos: ESA Copernicus, NASA, USGS_`;
     let headSub: Location.LocationSubscription;
 
     const startWatching = async () => {
+      setLoadingLocation(true);
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
+        setLoadingLocation(false);
         Alert.alert(
           'GPS Requerido',
-          'AgroCrop necesita tu ubicacion para funcionar. Habilita el GPS en Ajustes.',
+          'AgroCrop necesita tu ubicacion para funcionar. Ve a Configuracion > AgroCrop y activa la ubicacion.',
           [
             { text: 'Abrir Ajustes', onPress: () => Linking.openSettings() },
             { text: 'Reintentar', onPress: () => startWatching() },
@@ -763,8 +766,13 @@ _Datos: ESA Copernicus, NASA, USGS_`;
         return;
       }
       try {
-        const initialLoc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        // 10s timeout — fallback to low accuracy if slow
+        const initialLoc = await Promise.race([
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('GPS_TIMEOUT')), 10000)),
+        ]);
         setLocation(initialLoc);
+        setLoadingLocation(false);
         setMapCenter({
             latitude: initialLoc.coords.latitude,
             longitude: initialLoc.coords.longitude,
@@ -784,8 +792,22 @@ _Datos: ESA Copernicus, NASA, USGS_`;
         headSub = await Location.watchHeadingAsync((head) => {
           setHeading(head);
         });
-      } catch (err) {
-        console.warn('GPS Error: ', err);
+      } catch (err: any) {
+        console.warn('GPS Error:', err?.message);
+        setLoadingLocation(false);
+        if (err?.message === 'GPS_TIMEOUT') {
+          // Try low accuracy as fallback
+          try {
+            const fallback = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
+            setLocation(fallback);
+            setMapCenter({ latitude: fallback.coords.latitude, longitude: fallback.coords.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 });
+          } catch {
+            Alert.alert('GPS lento', 'No se pudo obtener tu ubicacion. El mapa cargara sin GPS.', [
+              { text: 'Reintentar', onPress: () => startWatching() },
+              { text: 'Continuar' },
+            ]);
+          }
+        }
       }
     };
     startWatching();
@@ -891,14 +913,15 @@ _Datos: ESA Copernicus, NASA, USGS_`;
     </View>
   );
 
-  if (!location) return (
+  if (!location && loadingLocation) return (
     <View style={styles.center}>
       <ActivityIndicator size="large" color={COLORS.verdeClaro} />
       <Text style={styles.loadingText}>Calibrando GPS...</Text>
+      <Text style={{ color: '#999', fontSize: 12, marginTop: 8 }}>Esto tarda maximo 10 segundos</Text>
     </View>
   );
 
-  const { latitude, longitude, altitude } = location.coords;
+  const { latitude, longitude, altitude } = location?.coords ?? { latitude: 24.3994, longitude: -107.1714, altitude: 0 };
   const trueHeading = heading ? heading.trueHeading || heading.magHeading : 0;
 
   return (
@@ -1032,7 +1055,13 @@ _Datos: ESA Copernicus, NASA, USGS_`;
           ))}
         </MapView>
 
-        {/* CROSSHAIR removed — direct tap to add points */}
+        {/* GPS loading overlay */}
+        {loadingLocation && location && (
+          <View style={{ position: 'absolute', top: 44, alignSelf: 'center', zIndex: 999, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <ActivityIndicator size="small" color={COLORS.verdeClaro} />
+            <Text style={{ color: '#FFF', fontSize: 12 }}>Actualizando GPS...</Text>
+          </View>
+        )}
 
         {/* CROP DRAW MODE OVERLAY */}
         {cropDrawing && (
@@ -1063,7 +1092,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
 
         {/* VERSION TAG */}
         <View style={styles.versionTag}>
-          <Text style={styles.versionTagText}>AgroCrop v3.1</Text>
+          <Text style={styles.versionTagText}>AgroCrop v3.2</Text>
         </View>
 
         {/* FLOATING MAP CONTROLS (RIGHT) */}
@@ -1074,8 +1103,25 @@ _Datos: ESA Copernicus, NASA, USGS_`;
           <TouchableOpacity style={styles.floatingBtn} onPress={zoomOut}>
             <MaterialCommunityIcons name="minus" size={22} color={COLORS.verdeMedio} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.floatingBtn} onPress={() => { if (location) { mapRef.current?.animateToRegion({ latitude: location.coords.latitude, longitude: location.coords.longitude, latitudeDelta: 0.005, longitudeDelta: 0.005 }, 500); } }}>
-            <MaterialCommunityIcons name="crosshairs-gps" size={22} color={COLORS.verdeMedio} />
+          <TouchableOpacity style={styles.floatingBtn} onPress={() => {
+            if (location) {
+              mapRef.current?.animateToRegion({ latitude: location.coords.latitude, longitude: location.coords.longitude, latitudeDelta: 0.005, longitudeDelta: 0.005 }, 500);
+            } else {
+              Alert.alert('GPS no disponible', 'Aun no se ha obtenido tu ubicacion.', [
+                { text: 'Reintentar GPS', onPress: async () => {
+                  setLoadingLocation(true);
+                  try {
+                    const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
+                    setLocation(loc);
+                    setLoadingLocation(false);
+                    mapRef.current?.animateToRegion({ latitude: loc.coords.latitude, longitude: loc.coords.longitude, latitudeDelta: 0.005, longitudeDelta: 0.005 }, 500);
+                  } catch { setLoadingLocation(false); }
+                }},
+                { text: 'OK' },
+              ]);
+            }
+          }}>
+            <MaterialCommunityIcons name="crosshairs-gps" size={22} color={location ? COLORS.verdeMedio : '#999'} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.floatingBtn} onPress={() => { triggerHaptic('heavy'); setShowChatModal(true); }}>
             <View style={[styles.northArrow, { transform: [{ rotate: `${-mapRotation}deg` }] }]}>
