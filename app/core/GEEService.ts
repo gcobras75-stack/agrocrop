@@ -626,17 +626,22 @@ export async function getBiomassGrid(
   coordinates: number[][],
   fecha_inicio: string,
   fecha_fin: string,
-  cell_size_km: number = 1
+  cell_size_km?: number          // undefined → servidor calcula automático por área
 ): Promise<BiomassGridResult> {
   const base = getServerUrl();
   const url = `${base}/api/biomass-grid`;
+
+  // Solo incluir cell_size_km si se pasa explícitamente
+  // (JSON.stringify omite undefined — evita sobreescribir el cálculo automático)
+  const reqBody: Record<string, unknown> = { coordinates, fecha_inicio, fecha_fin };
+  if (cell_size_km !== undefined) reqBody.cell_size_km = cell_size_km;
 
   let response: Response;
   try {
     response = await fetchWithTimeout(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ coordinates, fecha_inicio, fecha_fin, cell_size_km }),
+      body: JSON.stringify(reqBody),
     }, 60000);
   } catch (networkErr: any) {
     const reason = networkErr.name === 'AbortError' ? 'Timeout 30s' : networkErr.message;

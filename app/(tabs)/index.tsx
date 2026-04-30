@@ -776,17 +776,24 @@ _Datos: ESA Copernicus, NASA, USGS_`;
   // ── Heatmap grid polygon data (memoized) ────────────────────────────────
   const cropGridPolygons = useMemo(() => {
     if (!cropGridCells.length) return [];
-    const halfDeg = Math.max((cropCellSizeM / 1000) / 111.32 / 2, 0.00005);
-    console.log('[AgroCrop] Renderizando', cropGridCells.length, 'celdas, celda:', cropCellSizeM, 'm');
+
+    // Compute average latitude for accurate longitude degree size
+    const avgLat = cropGridCells.reduce((s: number, c: any) => s + c.lat, 0) / cropGridCells.length;
+    const cosLat  = Math.cos(avgLat * Math.PI / 180);
+    const sizeKm   = cropCellSizeM / 1000;
+    const halfLat  = Math.max(sizeKm / 111.32 / 2, 0.00005);
+    const halfLng  = Math.max(sizeKm / (111.32 * cosLat) / 2, 0.00005);
+
+    console.log(`[AgroCrop] Grid: ${cropGridCells.length} celdas, ${cropCellSizeM}m, halfLat=${halfLat.toFixed(6)}° halfLng=${halfLng.toFixed(6)}°`);
     return cropGridCells.map((cell: any, i: number) => {
-      // Use exact bounds from server if available, otherwise calculate from halfDeg
+      // Use exact bounds from server if available, otherwise calculate per-cell square
       const coords = cell.bounds && cell.bounds.length >= 4
         ? cell.bounds.map((b: any) => ({ latitude: b.lat, longitude: b.lng }))
         : [
-            { latitude: cell.lat - halfDeg, longitude: cell.lng - halfDeg },
-            { latitude: cell.lat - halfDeg, longitude: cell.lng + halfDeg },
-            { latitude: cell.lat + halfDeg, longitude: cell.lng + halfDeg },
-            { latitude: cell.lat + halfDeg, longitude: cell.lng - halfDeg },
+            { latitude: cell.lat - halfLat, longitude: cell.lng - halfLng },
+            { latitude: cell.lat - halfLat, longitude: cell.lng + halfLng },
+            { latitude: cell.lat + halfLat, longitude: cell.lng + halfLng },
+            { latitude: cell.lat + halfLat, longitude: cell.lng - halfLng },
           ];
       return {
         key: `hm-${i}`,
