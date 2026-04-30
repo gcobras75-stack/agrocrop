@@ -367,10 +367,10 @@ ${(cropData as any).proyeccion ? `
 ━━━━━━━━━━━━━━━━━
 🌿 *INDICADORES VEGETATIVOS*
 ━━━━━━━━━━━━━━━━━
-• NDVI (Vigor): ${cropData.ndvi_mean}
-• EVI (Biomasa): ${cropData.evi_mean}
-• NDRE (Nitrogeno): ${cropData.ndre_mean}
-• LSWI (Humedad): ${cropData.lswi_mean}
+• Vigor: ${cropData.ndvi_mean}
+• Biomasa: ${cropData.evi_mean}
+• Nitrogeno: ${cropData.ndre_mean}
+• Humedad: ${cropData.lswi_mean}
 
 ━━━━━━━━━━━━━━━━━
 📊 *CLASIFICACION*
@@ -393,7 +393,7 @@ ${(cropData as any).proyeccion ? `
 ━━━━━━━━━━━━━━━━━
 ${mangoSection}
 
-🤖 _Generado con AgroCrop v3.2_
+🤖 _Generado con AgroCrop v4.1_
 _Datos: ESA Copernicus, NASA, USGS_`;
 
       await Share.share({
@@ -1063,37 +1063,49 @@ _Datos: ESA Copernicus, NASA, USGS_`;
           </View>
         )}
 
-        {/* CROP DRAW MODE OVERLAY */}
+        {/* CROP DRAW MODE — Crosshair + controls */}
         {cropDrawing && (
           <>
+            {/* Banner top */}
             <View style={{ position: 'absolute', top: 44, left: 12, right: 12, zIndex: 999, backgroundColor: COLORS.verdeMedio, padding: 12, borderRadius: 12, alignItems: 'center' }}>
-              <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 15 }}>📍 Toca el mapa para agregar puntos • Arrastra para ajustar</Text>
-              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 }}>{polygonCoords.length} {polygonCoords.length === 1 ? 'punto' : 'puntos'} marcados</Text>
+              <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 15 }}>📍 Mueve el mapa y toca AGREGAR</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 }}>{polygonCoords.length} puntos | {polygonCoords.length >= 3 ? `${(calcPolygonArea(polygonCoords) / 10000).toFixed(1)} ha` : 'min. 3 puntos'}</Text>
             </View>
-            <View style={{ position: 'absolute', bottom: 100, left: 16, right: 16, zIndex: 999, flexDirection: 'row', gap: 10 }}>
-              {polygonCoords.length > 0 && (
-                <TouchableOpacity style={{ flex: 1, backgroundColor: COLORS.negroSuave, padding: 14, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }} onPress={() => setPolygonCoords(polygonCoords.slice(0, -1))}>
-                  <MaterialCommunityIcons name="undo" size={18} color="#FFF" />
-                  <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 14 }}>Deshacer</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity style={{ flex: 1, backgroundColor: '#FFF', padding: 14, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: COLORS.rojo }} onPress={() => { setCropDrawing(false); selectMode('none'); setPolygonCoords([]); }}>
-                <Text style={{ color: COLORS.rojo, fontWeight: '700', fontSize: 14 }}>Cancelar</Text>
+            {/* Crosshair center — fixed position */}
+            <View style={{ position: 'absolute', top: '50%', left: '50%', marginLeft: -25, marginTop: -25, width: 50, height: 50, zIndex: 998, alignItems: 'center', justifyContent: 'center' }} pointerEvents="none">
+              <View style={{ width: 40, height: 2, backgroundColor: COLORS.verdeClaro, position: 'absolute' }} />
+              <View style={{ width: 2, height: 40, backgroundColor: COLORS.verdeClaro, position: 'absolute' }} />
+              <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: COLORS.verdeClaro, backgroundColor: 'transparent' }} />
+            </View>
+            {/* Bottom controls */}
+            <View style={{ position: 'absolute', bottom: 100, left: 16, right: 16, zIndex: 999, gap: 8 }}>
+              {/* Main action: AGREGAR PUNTO */}
+              <TouchableOpacity style={{ backgroundColor: COLORS.verdeMedio, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 }} onPress={addPointFromCrosshair}>
+                <MaterialCommunityIcons name="map-marker-plus" size={22} color="#FFF" />
+                <Text style={{ color: '#FFF', fontWeight: '900', fontSize: 16 }}>AGREGAR PUNTO ({polygonCoords.length})</Text>
               </TouchableOpacity>
-              {polygonCoords.length >= 3 && (
-                <TouchableOpacity style={{ flex: 2, backgroundColor: COLORS.verdeClaro, padding: 14, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }} onPress={finishCropDraw}>
-                  <MaterialCommunityIcons name="check-circle" size={18} color="#FFF" />
-                  <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 14 }}>CERRAR POLIGONO</Text>
+              {/* Secondary row */}
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {polygonCoords.length > 0 && (
+                  <TouchableOpacity style={{ flex: 1, backgroundColor: '#FFF', height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, borderWidth: 1, borderColor: '#DDD' }} onPress={() => setPolygonCoords(polygonCoords.slice(0, -1))}>
+                    <MaterialCommunityIcons name="undo" size={16} color="#666" />
+                    <Text style={{ color: '#666', fontWeight: '600', fontSize: 14 }}>Deshacer</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity style={{ flex: 1, backgroundColor: '#FFF', height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.rojo }} onPress={() => { setCropDrawing(false); selectMode('none'); setPolygonCoords([]); }}>
+                  <Text style={{ color: COLORS.rojo, fontWeight: '600', fontSize: 14 }}>Cancelar</Text>
                 </TouchableOpacity>
-              )}
+                {polygonCoords.length >= 3 && (
+                  <TouchableOpacity style={{ flex: 2, backgroundColor: '#00C853', height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }} onPress={finishCropDraw}>
+                    <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 14 }}>✅ LISTO</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           </>
         )}
 
-        {/* VERSION TAG */}
-        <View style={styles.versionTag}>
-          <Text style={styles.versionTagText}>AgroCrop v3.2</Text>
-        </View>
+        {/* Version tag removed from map — shown in settings only */}
 
         {/* FLOATING MAP CONTROLS (RIGHT) */}
         <View style={styles.floatingControls}>
@@ -1131,17 +1143,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
           </TouchableOpacity>
         </View>
 
-        {/* FIELD INDICATORS (bottom-left) */}
-        <View style={styles.fieldIndicators}>
-          <View style={styles.fieldPill}>
-            <Text style={styles.fieldPillLabel}>ALT</Text>
-            <Text style={styles.fieldPillValue}>{altitude !== null && altitude !== undefined ? `${altitude.toFixed(0)}m` : '---'}</Text>
-          </View>
-          <View style={styles.fieldPill}>
-            <Text style={styles.fieldPillLabel}>HDG</Text>
-            <Text style={styles.fieldPillValue}>{trueHeading !== null && trueHeading !== undefined ? `${Math.round(trueHeading)}°` : '---'}</Text>
-          </View>
-        </View>
+        {/* Field indicators removed from map — cleaner UI */}
 
         {/* Heatmap legend */}
         {cropGridCells.length > 0 && (
@@ -1177,38 +1179,41 @@ _Datos: ESA Copernicus, NASA, USGS_`;
       {/* ═══ INFO ZONE BAR (only when polygon exists) ═══ */}
       {showStatsBox && (
         <View style={styles.infoZoneBar}>
-          <Text style={styles.infoZoneText}>📐 {areaHa} ha  |  Radio: {cropRadioKm}km  |  {infoText}</Text>
+          <Text style={styles.infoZoneText}>📐 {areaHa} ha  |  {infoText}</Text>
         </View>
       )}
 
-      {/* ═══ BOTTOM BAR (80px) ═══ */}
+      {/* ═══ BOTTOM BAR (88px) ═══ */}
       <View style={styles.bottomBar}>
         <TouchableOpacity
           style={[styles.bottomBtnPrimary, polygonCoords.length >= 3 && { backgroundColor: '#00C853' }]}
           onPress={() => {
             if (polygonCoords.length >= 3) {
-              if (!cropTipoCultivo || cropTipoCultivo === 'maiz_riego') {
-                Alert.alert('Tipo de cultivo', 'Selecciona el cultivo para analizar', [
-                  { text: 'Maiz Riego', onPress: () => startCropAnalysis(polygonCoords, 'maiz_riego') },
-                  { text: 'Maiz Temporal', onPress: () => startCropAnalysis(polygonCoords, 'maiz_temporal') },
-                  { text: 'Mango Ataulfo', onPress: () => startCropAnalysis(polygonCoords, 'mango_ataulfo') },
-                  { text: 'Mas opciones', onPress: () => setShowCropModal(true) },
-                ]);
-              } else {
-                startCropAnalysis(polygonCoords, cropTipoCultivo);
-              }
+              Alert.alert('¿Que cultivo tienes?', 'Selecciona para analizar', [
+                { text: '🌽 Maiz de riego', onPress: () => startCropAnalysis(polygonCoords, 'maiz_riego') },
+                { text: '🌾 Maiz temporal', onPress: () => startCropAnalysis(polygonCoords, 'maiz_temporal') },
+                { text: '🥭 Mango', onPress: () => startCropAnalysis(polygonCoords, 'mango_ataulfo') },
+                { text: '🍅 Tomate', onPress: () => startCropAnalysis(polygonCoords, 'tomate') },
+                { text: 'Cancelar', style: 'cancel' },
+              ]);
             } else {
               setShowCropModal(true);
             }
           }}
         >
-          <Text style={styles.bottomBtnPrimaryText}>{polygonCoords.length >= 3 ? '🚀 INICIAR ANALISIS' : '🌾 ANALIZAR mis cultivos'}</Text>
+          <Text style={styles.bottomBtnPrimaryText}>{polygonCoords.length >= 3 ? '🚀 Analizar' : '+ Nueva Parcela'}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.bottomBtnSecondary}
           onPress={async () => { await cargarParcelas(); setShowParcelasModal(true); }}
         >
-          <Text style={styles.bottomBtnSecondaryText}>📂 MIS PARCELAS</Text>
+          <Text style={styles.bottomBtnSecondaryText}>📂 Parcelas</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.bottomBtnSecondary, { flex: 0.3, borderColor: '#DDD' }]}
+          onPress={() => setShowConfigModal(true)}
+        >
+          <Text style={{ color: '#999', fontSize: 18 }}>⚙️</Text>
         </TouchableOpacity>
       </View>
 
@@ -1739,12 +1744,12 @@ _Datos: ESA Copernicus, NASA, USGS_`;
 
                 {/* Vegetation indices */}
                 <View style={styles.indicesCard}>
-                  <Text style={styles.indicesTitle}>INDICES VEGETATIVOS</Text>
+                  <Text style={styles.indicesTitle}>SALUD DEL CULTIVO</Text>
                   {[
-                    { label: 'Vigor (NDVI)', value: cropData.ndvi_mean, max: 1, color: COLORS.verdeClaro },
-                    { label: 'Biomasa (EVI)', value: cropData.evi_mean, max: 0.8, color: '#8BC34A' },
-                    { label: 'Nitrogeno (NDRE)', value: cropData.ndre_mean, max: 0.6, color: COLORS.amarilloMaiz },
-                    { label: 'Humedad (LSWI)', value: cropData.lswi_mean, max: 0.5, color: '#03A9F4' },
+                    { label: 'Vigor vegetativo', value: cropData.ndvi_mean, max: 1, color: COLORS.verdeClaro },
+                    { label: 'Biomasa', value: cropData.evi_mean, max: 0.8, color: '#8BC34A' },
+                    { label: 'Nitrogeno', value: cropData.ndre_mean, max: 0.6, color: COLORS.amarilloMaiz },
+                    { label: 'Humedad del suelo', value: cropData.lswi_mean, max: 0.5, color: '#03A9F4' },
                   ].map((idx, i) => (
                     <View key={i} style={{ marginBottom: 10 }}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
