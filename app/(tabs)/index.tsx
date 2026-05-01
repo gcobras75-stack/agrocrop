@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator, Platform, TouchableOpacity, Alert, Modal, TextInput, ScrollView, Switch, Share, Animated, Dimensions, Linking, PanResponder, KeyboardAvoidingView } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
-import MapView, { Marker, Polygon, Polyline, Region, MapPressEvent } from 'react-native-maps';
+import MapView, { Marker, Polygon, Polyline, Region, MapPressEvent, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -913,10 +913,12 @@ _Datos: ESA Copernicus, NASA, USGS_`;
 
   const triggerHaptic = (type: 'light' | 'medium' | 'heavy' | 'success') => {
     if (!vibrationEnabled) return;
-    if (type === 'heavy') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    else if (type === 'medium') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    else if (type === 'light') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    else if (type === 'success') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    try {
+      if (type === 'heavy') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      else if (type === 'medium') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      else if (type === 'light') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      else if (type === 'success') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch { /* haptics not available on this device */ }
   };
 
   const showToastNotification = (msg: string) => {
@@ -1140,7 +1142,8 @@ _Datos: ESA Copernicus, NASA, USGS_`;
         <MapView
           ref={mapRef}
           style={styles.map}
-          mapType={mapType}
+          provider={Platform.OS === 'android' ? PROVIDER_DEFAULT : undefined}
+          mapType={Platform.OS === 'android' ? 'standard' : mapType}
           showsUserLocation={false}
           followsUserLocation={false}
           showsCompass={false}
