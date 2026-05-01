@@ -9,9 +9,9 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import NetInfo from '@react-native-community/netinfo';
 import { initDB } from '../core/Database';
-import { askClaudeGeologist, analyzeCropBiomassWithClaude, CropBiomassStats, askClaudeAgronomo, AGRONOMOS, PREGUNTAS_RAPIDAS } from '../core/ClaudeServices';
+import { askClaudeGeologist, analyzeCropBiomassWithClaude, CropBiomassStats, askClaudeAgronomo, AGRONOMOS, PREGUNTAS_RAPIDAS, sanitizarTexto } from '../core/ClaudeServices';
 import { getBiomassAnalysis, BiomassAnalysisResult, generateCirclePolygon, getBiomassGrid, GridCell, getBiomassExtended, BiomassExtendedResult } from '../core/GEEService';
-import { AgroCropPolygon, generatePolygonId, getPolygonColor, extractCoordsFromPhoto, calcConsolidatedSummary } from '../core/AgroCropService';
+import { AgroCropPolygon, generatePolygonId, getPolygonColor, extractCoordsFromPhoto, calcConsolidatedSummary, validarCoordenadasCliente } from '../core/AgroCropService';
 import { guardarCalibracion, getFactorCorreccion, getPrecisionStats, getAdminStats, PrecisionStats } from '../core/SupabaseClient';
 
 type Coordinate = { latitude: number; longitude: number };
@@ -294,7 +294,7 @@ export default function AgroCropDashboard() {
   }, [cropTipoCultivo, cropData, mensajesAgronomo.length]);
 
   const enviarMensajeAgronomo = useCallback(async (textoOverride?: string, imagenBase64?: string) => {
-    const texto = textoOverride ?? inputAgronomo.trim();
+    const texto = sanitizarTexto(textoOverride ?? inputAgronomo.trim(), 500);
     if (!texto && !imagenBase64) return;
     if (cargandoAgronomo) return;
     const userMsg = { texto: texto || '📸 Foto enviada', esUsuario: true };
@@ -311,7 +311,8 @@ export default function AgroCropDashboard() {
       triggerHaptic('success');
       setTimeout(() => agronomoScrollRef.current?.scrollToEnd({ animated: true }), 80);
     } catch (e: any) {
-      setMensajesAgronomo(prev => [...prev, { texto: `Sin conexión: ${e.message?.substring(0, 60)}`, esUsuario: false }]);
+      console.error('[AgroCrop] Agrónomo error:', e);
+      setMensajesAgronomo(prev => [...prev, { texto: 'No se pudo conectar con el agrónomo. Intenta de nuevo.', esUsuario: false }]);
     } finally {
       setCargandoAgronomo(false);
     }
@@ -404,6 +405,11 @@ export default function AgroCropDashboard() {
       console.log('[AgroCrop] Modo area:', cropAreaMode, '| coords:', coordsToUse.length, '| tipo:', tipoToUse);
 
       if (coordsToUse.length >= 3) {
+        if (!validarCoordenadasCliente(coordsToUse)) {
+          Alert.alert('Error', 'Coordenadas inválidas. Verifica el polígono.');
+          setCropAnalyzing(false);
+          return;
+        }
         // Use provided/existing polygon coordinates
         geeCoords = coordsToUse.map(c => [c.longitude, c.latitude]);
         geeCoords.push(geeCoords[0]); // close ring
