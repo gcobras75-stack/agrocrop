@@ -12,6 +12,7 @@ import { initDB } from '../core/Database';
 import { askClaudeGeologist, analyzeCropBiomassWithClaude, CropBiomassStats, askClaudeAgronomo, AGRONOMOS, PREGUNTAS_RAPIDAS } from '../core/ClaudeServices';
 import { getBiomassAnalysis, BiomassAnalysisResult, generateCirclePolygon, getBiomassGrid, GridCell, getBiomassExtended, BiomassExtendedResult } from '../core/GEEService';
 import { AgroCropPolygon, generatePolygonId, getPolygonColor, extractCoordsFromPhoto, calcConsolidatedSummary } from '../core/AgroCropService';
+import { guardarCalibracion, getFactorCorreccion, getPrecisionStats, getAdminStats, PrecisionStats } from '../core/SupabaseClient';
 
 type Coordinate = { latitude: number; longitude: number };
 type DrawingType = 'none' | 'polygon';
@@ -92,6 +93,20 @@ export default function AgroCropDashboard() {
   const [cargandoAgronomo, setCargandoAgronomo] = useState(false);
   const [cultivoChat, setCultivoChat] = useState('');
   const agronomoScrollRef = useRef<ScrollView>(null);
+
+  // --- Calibración regional ---
+  const [cosechaInput, setCosechaInput] = useState('');
+  const [fechaCosechaInput, setFechaCosechaInput] = useState('');
+  const [precioVentaInput, setPrecioVentaInput] = useState('');
+  const [sistemaRiegoInput, setSistemaRiegoInput] = useState('');
+  const [guardandoCosecha, setGuardandoCosecha] = useState(false);
+  const [cosechaGuardada, setCosechaGuardada] = useState<any>(null);
+  const [factorCalib, setFactorCalib] = useState<{ factor: number; muestras: number }>({ factor: 1.0, muestras: 0 });
+  const [precisionStats, setPrecisionStats] = useState<PrecisionStats | null>(null);
+  const [adminStats, setAdminStats] = useState<any>(null);
+  const [adminPinInput, setAdminPinInput] = useState('');
+  const [adminUnlocked, setAdminUnlocked] = useState(false);
+  const ADMIN_PIN = '2025';
 
   // --- Red y Sync ---
   const [isConnected, setIsConnected] = useState(true);
@@ -217,7 +232,7 @@ export default function AgroCropDashboard() {
 
   // Combined action sheet state
   const [showActionSheet, setShowActionSheet] = useState(false);
-  const [currentScreen, setCurrentScreen] = useState<'map' | 'parcelas' | 'nueva_parcela' | 'trazar' | 'coordenadas' | 'foto' | 'datos_parcela' | 'agronomo'>('map');
+  const [currentScreen, setCurrentScreen] = useState<'map' | 'parcelas' | 'nueva_parcela' | 'trazar' | 'coordenadas' | 'foto' | 'datos_parcela' | 'agronomo' | 'registrar_cosecha' | 'admin'>('map');
   const [datosParcelaFrom, setDatosParcelaFrom] = useState<'trazar' | 'coordenadas' | 'foto'>('trazar');
   const [toastMsg, setToastMsg] = useState('');
   const [showToast, setShowToast] = useState(false);
@@ -310,6 +325,59 @@ export default function AgroCropDashboard() {
     }
   }, [enviarMensajeAgronomo]);
 
+  // ── Cargar factor de calibración después del análisis ───────────────────
+  const cargarFactorCalib = useCallback(async (tipoCultivo: string, ndvi: number) => {
+    try {
+      const result = await getFactorCorreccion(tipoCultivo, ndvi);
+      setFactorCalib(result);
+      const stats = await getPrecisionStats(tipoCultivo);
+      setPrecisionStats(stats);
+    } catch { /* Supabase not configured yet */ }
+  }, []);
+
+  // ── Guardar cosecha real en Supabase ────────────────────────────────────
+  const guardarCosechaReal = useCallback(async () => {
+    if (!cosechaInput.trim() || !cropData) return;
+    const realTon = parseFloat(cosechaInput);
+    if (isNaN(realTon) || realTon <= 0) { Alert.alert('Error', 'Ingresa una cantidad válida de toneladas.'); return; }
+    setGuardandoCosecha(true);
+    triggerHaptic('medium');
+    try {
+      await guardarCalibracion({
+        ndvi_promedio: cropData.ndvi_mean,
+        evi_promedio: cropData.evi_mean,
+        ndre_promedio: cropData.ndre_mean,
+        prediccion_ton_ha: cropData.rendimiento_por_hectarea,
+        prediccion_total_ton: cropData.tonelaje_estimado,
+        fecha_imagen_satelital: cropData.imagen_mas_reciente_global ?? '',
+        fecha_cosecha: fechaCosechaInput || new Date().toISOString().split('T')[0],
+        cosecha_real_ton: realTon,
+        rendimiento_real_ton_ha: cropData.hectareas_cultivo_activo > 0
+          ? +(realTon / cropData.hectareas_cultivo_activo).toFixed(2) : realTon,
+        precio_venta_mxn: precioVentaInput ? parseFloat(precioVentaInput) : undefined,
+        tipo_cultivo: cropTipoCultivo,
+        sistema_riego: sistemaRiegoInput || undefined,
+      });
+      const precio = precioVentaInput ? parseFloat(precioVentaInput) : null;
+      const diff = realTon - cropData.tonelaje_estimado;
+      const diffPct = cropData.tonelaje_estimado > 0
+        ? +((diff / cropData.tonelaje_estimado) * 100).toFixed(1) : 0;
+      setCosechaGuardada({
+        prediccion: cropData.tonelaje_estimado,
+        real: realTon,
+        diff, diffPct,
+        valor: precio ? Math.round(realTon * precio) : null,
+        precio,
+      });
+      await cargarFactorCalib(cropTipoCultivo, cropData.ndvi_mean);
+      triggerHaptic('success');
+    } catch (e: any) {
+      Alert.alert('Error al guardar', e.message);
+    } finally {
+      setGuardandoCosecha(false);
+    }
+  }, [cosechaInput, fechaCosechaInput, precioVentaInput, sistemaRiegoInput, cropData, cropTipoCultivo, cargarFactorCalib]);
+
   // ── AgroCrop analysis flow ─────────────────────────────────────────────
   const startCropAnalysis = async (coordsOverride?: Coordinate[], tipoOverride?: string) => {
     setCropError('');
@@ -360,6 +428,7 @@ export default function AgroCropDashboard() {
       setCropStep('Procesando Sentinel-2... (30-60s)');
       const result = await getBiomassAnalysis(geeCoords, cropFechaInicio, cropFechaFin, tipoToUse);
       setCropData(result);
+      cargarFactorCalib(tipoToUse, result.ndvi_mean).catch(() => {});
       triggerHaptic('light');
 
       // Step 2: Claude analysis
@@ -1488,6 +1557,13 @@ _Datos: ESA Copernicus, NASA, USGS_`;
             <TouchableOpacity style={styles.configSaveBtn} onPress={() => setShowConfigModal(false)}>
               <Text style={styles.configSaveBtnText}>Guardar</Text>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{ marginTop: 8, padding: 12, alignItems: 'center' }}
+              onPress={() => { setShowConfigModal(false); setAdminUnlocked(false); setAdminPinInput(''); setCurrentScreen('admin'); }}
+            >
+              <Text style={{ color: '#999', fontSize: 12 }}>Admin 🔒</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1894,6 +1970,34 @@ _Datos: ESA Copernicus, NASA, USGS_`;
                   );
                 })()}
 
+                {/* Calibration confidence indicator */}
+                {(() => {
+                  const tonAjustado = factorCalib.factor !== 1.0 && cropData
+                    ? Math.round(cropData.tonelaje_estimado * factorCalib.factor) : null;
+                  return (
+                    <View style={styles.calibCard}>
+                      {factorCalib.muestras >= 3 ? (
+                        <>
+                          <Text style={styles.calibTitle}>📊 Calibrado con {factorCalib.muestras} cosechas reales</Text>
+                          {tonAjustado && (
+                            <Text style={styles.calibAdj}>
+                              Ajuste aplicado: {cropData!.tonelaje_estimado} → <Text style={{ fontWeight: '700', color: COLORS.verdeMedio }}>{tonAjustado} ton</Text> (×{factorCalib.factor})
+                            </Text>
+                          )}
+                          {precisionStats && (
+                            <Text style={styles.calibPrecision}>Precisión acumulada: ±{precisionStats.error_promedio_pct}% | {precisionStats.total_cosechas} cosechas</Text>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <Text style={styles.calibTitle}>📊 Modelo base · sin calibración regional aún</Text>
+                          <Text style={styles.calibPrecision}>Precisión estimada: ±18% · Ayúdanos registrando tu cosecha</Text>
+                        </>
+                      )}
+                    </View>
+                  );
+                })()}
+
                 {/* Production card */}
                 <View style={styles.productionCard}>
                   <Text style={styles.productionLabel}>TONELAJE ESTIMADO</Text>
@@ -1931,6 +2035,21 @@ _Datos: ESA Copernicus, NASA, USGS_`;
                     <Text style={styles.projectionRange}>Rango: {(cropData as any).proyeccion.rango_min.toLocaleString()} - {(cropData as any).proyeccion.rango_max.toLocaleString()} | {(cropData as any).proyeccion.confianza}</Text>
                   </View>
                 )}
+
+                {/* Register harvest button */}
+                <TouchableOpacity
+                  style={styles.registrarCosechaBtn}
+                  onPress={() => {
+                    setCosechaInput('');
+                    setFechaCosechaInput('');
+                    setPrecioVentaInput('');
+                    setSistemaRiegoInput('');
+                    setCosechaGuardada(null);
+                    setCurrentScreen('registrar_cosecha');
+                  }}
+                >
+                  <Text style={styles.registrarCosechaBtnText}>📥 Registrar cosecha real</Text>
+                </TouchableOpacity>
 
                 {/* Key metrics */}
                 <View style={styles.metricsRow}>
@@ -2131,6 +2250,164 @@ _Datos: ESA Copernicus, NASA, USGS_`;
         </TouchableOpacity>
       )}
 
+      {/* ═══ SCREEN: REGISTRAR COSECHA REAL ═══ */}
+      {currentScreen === 'registrar_cosecha' && (
+        <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: '#FAFAFA', zIndex: 300 }}>
+          {/* Header */}
+          <View style={{ height: 72, backgroundColor: COLORS.verdePrimario, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 12 : 0 }}>
+            <TouchableOpacity onPress={() => { setCurrentScreen('map'); setCosechaGuardada(null); }} style={{ marginRight: 16, padding: 4 }}>
+              <Text style={{ color: '#FFF', fontSize: 20 }}>←</Text>
+            </TouchableOpacity>
+            <Text style={{ color: '#FFF', fontSize: 17, fontWeight: '700' }}>📥 Registrar Cosecha Real</Text>
+          </View>
+
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20 }} keyboardShouldPersistTaps="handled">
+
+              {cosechaGuardada ? (
+                /* ── Feedback screen after saving ── */
+                <View>
+                  <View style={styles.cosechaFeedbackCard}>
+                    <Text style={styles.cosechaFeedbackThanks}>✅ ¡Gracias por compartir!</Text>
+                    <Text style={styles.cosechaFeedbackSub}>Tu dato mejora AgroCrop para todos los productores de Sinaloa</Text>
+                  </View>
+
+                  <View style={[styles.cosechaCompCard, { marginTop: 16 }]}>
+                    <Text style={styles.cosechaCompTitle}>📊 COMPARATIVO DE TU COSECHA</Text>
+                    <View style={styles.cosechaCompRow}>
+                      <Text style={styles.cosechaCompLabel}>Predicción AgroCrop:</Text>
+                      <Text style={styles.cosechaCompVal}>{cosechaGuardada.prediccion.toLocaleString()} ton</Text>
+                    </View>
+                    <View style={styles.cosechaCompRow}>
+                      <Text style={styles.cosechaCompLabel}>Tu cosecha real:</Text>
+                      <Text style={[styles.cosechaCompVal, { color: COLORS.verdeMedio, fontWeight: '700' }]}>{cosechaGuardada.real.toLocaleString()} ton</Text>
+                    </View>
+                    <View style={[styles.cosechaCompRow, { borderTopWidth: 1, borderTopColor: '#F0F0F0', paddingTop: 8, marginTop: 4 }]}>
+                      <Text style={styles.cosechaCompLabel}>Diferencia:</Text>
+                      <Text style={[styles.cosechaCompVal, { color: cosechaGuardada.diff >= 0 ? COLORS.verdeClaro : COLORS.rojo }]}>
+                        {cosechaGuardada.diff >= 0 ? '+' : ''}{cosechaGuardada.diff.toFixed(0)} ton ({cosechaGuardada.diff >= 0 ? '+' : ''}{cosechaGuardada.diffPct}%)
+                      </Text>
+                    </View>
+                  </View>
+
+                  {cosechaGuardada.valor != null && (
+                    <View style={[styles.cosechaCompCard, { marginTop: 12, backgroundColor: '#F0FFF4' }]}>
+                      <Text style={styles.cosechaCompTitle}>💰 VALOR DE TU COSECHA</Text>
+                      <Text style={{ fontSize: 22, fontWeight: '800', color: COLORS.verdePrimario, marginTop: 6 }}>
+                        ${cosechaGuardada.valor.toLocaleString()} MXN
+                      </Text>
+                      <Text style={{ color: '#888', fontSize: 12, marginTop: 2 }}>
+                        {cosechaGuardada.real} ton × ${cosechaGuardada.precio?.toLocaleString()} MXN/ton
+                      </Text>
+                    </View>
+                  )}
+
+                  {precisionStats && (
+                    <View style={[styles.cosechaCompCard, { marginTop: 12 }]}>
+                      <Text style={styles.cosechaCompTitle}>📈 PRECISIÓN ACUMULADA</Text>
+                      <Text style={{ color: '#555', fontSize: 13, marginTop: 6 }}>
+                        {cropData?.tipo_cultivo_label ?? cropTipoCultivo} en Sinaloa
+                      </Text>
+                      <Text style={{ color: '#555', fontSize: 13 }}>
+                        Basado en {precisionStats.total_cosechas} cosechas reales
+                      </Text>
+                      <Text style={{ color: '#555', fontSize: 13 }}>
+                        Error promedio: ±{precisionStats.error_promedio_pct}%
+                      </Text>
+                      <Text style={{ color: COLORS.verdeMedio, fontSize: 13, fontWeight: '700', marginTop: 4 }}>
+                        Tu predicción estuvo: ±{Math.abs(cosechaGuardada.diffPct)}% {Math.abs(cosechaGuardada.diffPct) <= precisionStats.error_promedio_pct ? '🎯 Mejor que el promedio' : ''}
+                      </Text>
+                    </View>
+                  )}
+
+                  <TouchableOpacity
+                    style={[styles.registrarCosechaBtn, { marginTop: 20 }]}
+                    onPress={() => setCurrentScreen('map')}
+                  >
+                    <Text style={styles.registrarCosechaBtnText}>← Volver al mapa</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                /* ── Registration form ── */
+                <View>
+                  {cropData && (
+                    <View style={styles.cosechaPreviewCard}>
+                      <Text style={styles.cosechaPreviewCultivo}>{cropData.tipo_cultivo_label ?? cropTipoCultivo}</Text>
+                      <Text style={styles.cosechaPreviewPred}>Predicción AgroCrop: <Text style={{ fontWeight: '700', color: COLORS.verdeMedio }}>{cropData.tonelaje_estimado.toLocaleString()} ton</Text></Text>
+                      <Text style={styles.cosechaPreviewDate}>Imagen satelital: {cropData.imagen_mas_reciente_global ?? ''}</Text>
+                    </View>
+                  )}
+
+                  <Text style={styles.cosechaLabel}>¿Cuánto cosechaste en total?</Text>
+                  <View style={styles.cosechaInputRow}>
+                    <TextInput
+                      style={[styles.cosechaInput, { flex: 1 }]}
+                      placeholder="Ej. 180"
+                      placeholderTextColor="#AAA"
+                      keyboardType="decimal-pad"
+                      value={cosechaInput}
+                      onChangeText={setCosechaInput}
+                    />
+                    <Text style={styles.cosechaUnit}>ton</Text>
+                  </View>
+
+                  <Text style={styles.cosechaLabel}>Fecha de cosecha:</Text>
+                  <TextInput
+                    style={styles.cosechaInput}
+                    placeholder="YYYY-MM-DD  ej. 2026-05-15"
+                    placeholderTextColor="#AAA"
+                    value={fechaCosechaInput}
+                    onChangeText={setFechaCosechaInput}
+                  />
+
+                  <Text style={styles.cosechaLabel}>Precio de venta (opcional):</Text>
+                  <View style={styles.cosechaInputRow}>
+                    <TextInput
+                      style={[styles.cosechaInput, { flex: 1 }]}
+                      placeholder="Ej. 4800"
+                      placeholderTextColor="#AAA"
+                      keyboardType="decimal-pad"
+                      value={precioVentaInput}
+                      onChangeText={setPrecioVentaInput}
+                    />
+                    <Text style={styles.cosechaUnit}>MXN/ton</Text>
+                  </View>
+
+                  <Text style={styles.cosechaLabel}>Sistema de riego:</Text>
+                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
+                    {['Goteo', 'Gravedad', 'Aspersión', 'Temporal'].map(s => (
+                      <TouchableOpacity
+                        key={s}
+                        style={[styles.riegoChip, sistemaRiegoInput === s && { backgroundColor: COLORS.verdeMedio, borderColor: COLORS.verdeMedio }]}
+                        onPress={() => setSistemaRiegoInput(sistemaRiegoInput === s ? '' : s)}
+                      >
+                        <Text style={[styles.riegoChipText, sistemaRiegoInput === s && { color: '#FFF' }]}>{s}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <TouchableOpacity
+                    style={[styles.registrarCosechaBtn, { opacity: guardandoCosecha || !cosechaInput.trim() ? 0.6 : 1 }]}
+                    onPress={guardarCosechaReal}
+                    disabled={guardandoCosecha || !cosechaInput.trim()}
+                  >
+                    {guardandoCosecha
+                      ? <ActivityIndicator color="#FFF" />
+                      : <Text style={styles.registrarCosechaBtnText}>💾 GUARDAR MI COSECHA</Text>}
+                  </TouchableOpacity>
+
+                  <View style={{ alignItems: 'center', marginTop: 16, paddingHorizontal: 20 }}>
+                    <Text style={{ color: '#888', fontSize: 13, textAlign: 'center' }}>
+                      🙏 Tu dato mejora AgroCrop para todos los productores de Sinaloa
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      )}
+
       {/* ═══ SCREEN: AGRÓNOMO IA ═══ */}
       {currentScreen === 'agronomo' && (() => {
         const ag = AGRONOMOS[cultivoChat] ?? AGRONOMOS.maiz_riego;
@@ -2253,6 +2530,76 @@ _Datos: ESA Copernicus, NASA, USGS_`;
           </KeyboardAvoidingView>
         );
       })()}
+
+      {/* ═══ SCREEN: ADMIN CALIBRACIÓN ═══ */}
+      {currentScreen === 'admin' && (
+        <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: '#0A0A0A', zIndex: 310 }}>
+          <View style={{ height: 72, backgroundColor: '#1A1A1A', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 12 : 0 }}>
+            <TouchableOpacity onPress={() => { setCurrentScreen('map'); setAdminUnlocked(false); setAdminPinInput(''); }} style={{ marginRight: 16 }}>
+              <Text style={{ color: '#FFF', fontSize: 20 }}>←</Text>
+            </TouchableOpacity>
+            <Text style={{ color: '#FFF', fontSize: 17, fontWeight: '700' }}>📊 Admin · Calibración</Text>
+          </View>
+          <ScrollView style={{ flex: 1, padding: 20 }}>
+            {!adminUnlocked ? (
+              <View style={{ alignItems: 'center', paddingTop: 60 }}>
+                <Text style={{ color: '#FFF', fontSize: 18, marginBottom: 20 }}>🔒 PIN requerido</Text>
+                <TextInput
+                  style={{ backgroundColor: '#222', color: '#FFF', borderRadius: 12, padding: 16, fontSize: 24, letterSpacing: 8, textAlign: 'center', width: 180, marginBottom: 16 }}
+                  secureTextEntry
+                  keyboardType="number-pad"
+                  maxLength={4}
+                  value={adminPinInput}
+                  onChangeText={v => {
+                    setAdminPinInput(v);
+                    if (v === ADMIN_PIN) {
+                      setAdminUnlocked(true);
+                      getAdminStats().then(setAdminStats).catch(() => {});
+                    }
+                  }}
+                  placeholder="••••"
+                  placeholderTextColor="#555"
+                />
+                <Text style={{ color: '#555', fontSize: 12 }}>Acceso solo para administrador</Text>
+              </View>
+            ) : (
+              <View>
+                <Text style={{ color: '#4CAF50', fontSize: 22, fontWeight: '800', marginBottom: 20 }}>📊 DASHBOARD DE CALIBRACIÓN</Text>
+                {adminStats ? (
+                  <>
+                    <View style={{ backgroundColor: '#1A1A1A', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+                      <Text style={{ color: '#FFF', fontSize: 28, fontWeight: '800' }}>{adminStats.total}</Text>
+                      <Text style={{ color: '#888', fontSize: 13 }}>cosechas registradas en total</Text>
+                    </View>
+                    <Text style={{ color: '#4CAF50', fontSize: 14, fontWeight: '700', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Precisión por cultivo</Text>
+                    {adminStats.porCultivo?.map((c: any) => (
+                      <View key={c.tipo_cultivo} style={{ backgroundColor: '#1A1A1A', borderRadius: 10, padding: 14, marginBottom: 8 }}>
+                        <Text style={{ color: '#FFF', fontWeight: '700' }}>{c.tipo_cultivo}</Text>
+                        <Text style={{ color: '#4CAF50' }}>±{c.error_promedio_pct}% promedio · {c.total_cosechas} muestras</Text>
+                      </View>
+                    ))}
+                    <Text style={{ color: '#4CAF50', fontSize: 14, fontWeight: '700', marginTop: 16, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Municipios con más datos</Text>
+                    {adminStats.porMunicipio?.map((m: any, i: number) => (
+                      <View key={m.municipio} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#222' }}>
+                        <Text style={{ color: '#FFF' }}>{i + 1}. {m.municipio}</Text>
+                        <Text style={{ color: '#888' }}>{m.count} cosechas</Text>
+                      </View>
+                    ))}
+                  </>
+                ) : (
+                  <View style={{ alignItems: 'center', paddingTop: 40 }}>
+                    <ActivityIndicator color="#4CAF50" />
+                    <Text style={{ color: '#888', marginTop: 12 }}>Cargando estadísticas...</Text>
+                    <Text style={{ color: '#555', marginTop: 8, fontSize: 11, textAlign: 'center' }}>
+                      (Requiere EXPO_PUBLIC_SUPABASE_URL configurado)
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      )}
 
       {/* ═══ SCREEN: MIS PARCELAS ═══ */}
       {currentScreen === 'parcelas' && (
@@ -2998,6 +3345,53 @@ const styles = StyleSheet.create({
   // Error
   errorCard: { backgroundColor: '#FFF5F5', borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#FFCDD2' },
   errorCardText: { color: COLORS.rojo, fontSize: 13 },
+
+  // Calibración
+  calibCard: {
+    backgroundColor: '#F0FFF4', borderRadius: 10, padding: 12, marginBottom: 10,
+    borderWidth: 1, borderColor: '#C8E6C9',
+  },
+  calibTitle: { color: COLORS.verdePrimario, fontSize: 12, fontWeight: '700' },
+  calibAdj: { color: '#555', fontSize: 11, marginTop: 3 },
+  calibPrecision: { color: '#888', fontSize: 11, marginTop: 2 },
+  registrarCosechaBtn: {
+    backgroundColor: COLORS.verdeMedio, borderRadius: 14, padding: 16,
+    alignItems: 'center', marginBottom: 10,
+  },
+  registrarCosechaBtnText: { color: '#FFF', fontWeight: '700', fontSize: 15 },
+  cosechaPreviewCard: {
+    backgroundColor: '#F5F5F5', borderRadius: 12, padding: 14, marginBottom: 20,
+  },
+  cosechaPreviewCultivo: { color: '#333', fontSize: 16, fontWeight: '700', marginBottom: 4 },
+  cosechaPreviewPred: { color: '#555', fontSize: 14, marginBottom: 2 },
+  cosechaPreviewDate: { color: '#888', fontSize: 12 },
+  cosechaLabel: { color: '#555', fontSize: 14, fontWeight: '600', marginBottom: 6, marginTop: 16 },
+  cosechaInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cosechaInput: {
+    backgroundColor: '#FFF', borderRadius: 10, padding: 14, fontSize: 16,
+    borderWidth: 1, borderColor: '#DDD', color: '#333', marginBottom: 4,
+  },
+  cosechaUnit: { color: '#888', fontSize: 13, minWidth: 55 },
+  riegoChip: {
+    borderWidth: 1, borderColor: '#DDD', borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 7,
+  },
+  riegoChipText: { color: '#555', fontSize: 13 },
+  cosechaFeedbackCard: {
+    backgroundColor: COLORS.verdeSuave, borderRadius: 14, padding: 20,
+    alignItems: 'center', borderWidth: 1, borderColor: '#A5D6A7',
+  },
+  cosechaFeedbackThanks: { color: COLORS.verdePrimario, fontSize: 20, fontWeight: '800', marginBottom: 6 },
+  cosechaFeedbackSub: { color: '#555', fontSize: 13, textAlign: 'center' },
+  cosechaCompCard: {
+    backgroundColor: '#FFF', borderRadius: 12, padding: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
+  },
+  cosechaCompTitle: { color: '#999', fontSize: 11, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase' as const },
+  cosechaCompRow: { flexDirection: 'row' as const, justifyContent: 'space-between' as const, paddingVertical: 6 },
+  cosechaCompLabel: { color: '#666', fontSize: 14 },
+  cosechaCompVal: { color: '#333', fontSize: 14, fontWeight: '600' },
 
   // Agrónomo IA Screen
   agronomoHeader: {
