@@ -1,17 +1,5 @@
-﻿// app/core/ClaudeServices.ts
-// GeologicalEngine removed — type kept for legacy function signature
-type AnalysisPoint = { id: string; rank: number; base_score: number; indices: any; lat: number; lng: number };
-
-// ─── MODELOS ───────────────────────────────────────────
-const MODEL_FAST   = 'claude-haiku-4-5-20251001';   // Cámara y chat
-const MODEL_SMART  = 'claude-sonnet-4-6';            // Análisis espectral
-
-// ─── SERVIDOR RAILWAY (API KEY nunca sale de aquí) ─────
-function getServerUrl(): string {
-  const url = process.env.EXPO_PUBLIC_SERVER_URL?.trim();
-  if (!url) throw new Error('Configura EXPO_PUBLIC_SERVER_URL en tu .env');
-  return url;
-}
+// app/core/ClaudeServices.ts — AgroCrop v5.5
+// Claude API calls go through Railway server — API key never exposed to the app.
 
 // ─── RETRY CON BACKOFF EXPONENCIAL ─────────────────────
 async function fetchWithRetry(
@@ -38,193 +26,14 @@ async function fetchWithRetry(
   throw lastError;
 }
 
-// ─── HELPERS para llamadas directas (ProspectorAI legacy) ──
-function getHeaders(apiKey: string): Record<string, string> {
-  return {
-    'Content-Type': 'application/json',
-    'x-api-key': apiKey,
-    'anthropic-version': '2023-06-01',
-    'anthropic-dangerous-direct-browser-access': 'true'
-  };
-}
-
-function getApiKey(): string {
-  const key = process.env.EXPO_PUBLIC_CLAUDE_API_KEY?.trim();
-  if (!key) throw new Error('Configura EXPO_PUBLIC_CLAUDE_API_KEY en tu .env');
-  return key;
-}
-
 // ═══════════════════════════════════════════════════════
-// 1. ANÁLISIS DE IMAGEN DE ROCA
-// ═══════════════════════════════════════════════════════
-export interface ClaudeAnalysis {
-  mineral_detectado: string;
-  probabilidad: number;
-  indicadores: string[];
-  alteracion: string;
-  fluorescencia_uv: string;
-  recomendacion: string;
-  analisis_detallado: string;
-}
-
-export async function analyzeRockImageWithClaude(
-  base64Image: string,
-  captureType: string
-): Promise<ClaudeAnalysis> {
-  const API_KEY = getApiKey();
-
-  let promptContext = "Muestra de campo estándar capturada con cámara normal de smartphone.";
-  if (captureType === 'microscopio') {
-    promptContext = "Imagen macro capturada con microscopio de alta magnificación. Busca cristales micrométricos, texturas finas y estructuras internas críticas.";
-  } else if (captureType.startsWith('uv_')) {
-    promptContext = `Imagen bajo iluminación UV tipo ${captureType}. Analiza patrones de fluorescencia espectral (Tungsteno, Fluorita, Scheelita, Calcita, Uranio secundario).`;
-  }
-
-  const payload = {
-    model: MODEL_FAST,
-    max_tokens: 1500,
-    messages: [{
-      role: "user",
-      content: [
-        {
-          type: "image",
-          source: { type: "base64", media_type: "image/jpeg", data: base64Image }
-        },
-        {
-          type: "text",
-          text: `Actúa como el mejor geólogo del mundo experto en alteraciones y metalogenia. Analiza visualmente esta muestra. ${promptContext}
-
-Identifica el metal o mineral evaluando texturas, alteraciones y colores. Sé definitivo y preciso.
-
-Devuelve EXCLUSIVAMENTE JSON válido (sin markdown):
-{
-  "mineral_detectado": "Ej. Cuarzo aurífero con arsenopirita",
-  "probabilidad": 85,
-  "indicadores": ["textura en peineta", "fuerte lixiviación"],
-  "alteracion": "Ej. Argílica avanzada",
-  "fluorescencia_uv": "N/A o describe color y mineral bajo UV",
-  "analisis_detallado": "Explicación técnica de las paragénesis observadas.",
-  "recomendacion": "Acción directa de campo. Ej: 🔴 Muestreo sistemático de canal."
-}`
-        }
-      ]
-    }]
-  };
-
-  const response = await fetchWithRetry(
-    'https://api.anthropic.com/v1/messages',
-    { method: 'POST', headers: getHeaders(API_KEY), body: JSON.stringify(payload) }
-  );
-
-  if (!response.ok) {
-    const err = await response.text();
-    let msg = err;
-    try { msg = JSON.parse(err).error?.message || err; } catch {}
-    throw new Error(`Anthropic (${response.status}): ${msg.substring(0, 100)}`);
-  }
-
-  const data = await response.json();
-  const content = data.content?.[0]?.text || '';
-  const match = content.match(/\{[\s\S]*\}/);
-  if (match) {
-    try { return JSON.parse(match[0]); } catch (parseErr) {
-      throw new Error('Error al parsear JSON de la IA. Respuesta: ' + content.substring(0, 120));
-    }
-  }
-
-  throw new Error('La IA no devolvió un JSON válido. Respuesta recibida: ' + (content.substring(0, 120) || '(vacía)'));
-}
-
-// ═══════════════════════════════════════════════════════
-// 2. ANÁLISIS ESPECTRAL POR LOTE (usa Sonnet - más inteligente)
-// ═══════════════════════════════════════════════════════
-export interface IndiceAnalizado {
-  nombre: string;
-  valor: number;
-  nivel: 'ALTO' | 'MEDIO' | 'BAJO';
-  interpretacion: string;
-}
-
-export interface SpectralAnalysisResult {
-  id: string;
-  score: number;
-  indices_analizados: IndiceAnalizado[];
-  analisis_integral: string;
-  geologia_interpretada: string;
-  recomendacion: string;
-}
-
-export async function analyzeSpectralCandidatesBatch(
-  candidates: AnalysisPoint[],
-  mineral: string,
-  terrain: string,
-  rockType: string
-): Promise<SpectralAnalysisResult[]> {
-  const API_KEY = getApiKey();
-
-  const candidatesData = candidates.map(c => ({
-    id: c.id, rank: c.rank, base_score: c.base_score, indices: c.indices
-  }));
-
-  const prompt = `Eres un Geólogo Principal experto en exploración de recursos minerales.
-Analiza índices espectrales de ${candidates.length} puntos candidatos.
-Mineral objetivo: ${mineral.toUpperCase()}
-Contexto: Terreno "${terrain}", roca dominante "${rockType}".
-
-Interpreta los valores como anomalías espectrales reales de satélites hiperespectrales.
-Genera análisis PROFESIONAL y ESPECÍFICO basado en los valores numéricos.
-
-Datos:
-${JSON.stringify(candidatesData, null, 2)}
-
-Devuelve EXCLUSIVAMENTE un arreglo JSON válido (sin markdown):
-[
-  {
-    "id": "MISMO_ID_DEL_CANDIDATO",
-    "score": 98,
-    "indices_analizados": [
-      {
-        "nombre": "Gossan",
-        "valor": 0.87,
-        "nivel": "ALTO",
-        "interpretacion": "Oxidación intensa, sombrero de hierro sobre veta"
-      }
-    ],
-    "analisis_integral": "Explicación técnica con datos numéricos del porqué indica el mineral.",
-    "geologia_interpretada": "Modelo geológico proyectado (ej. Zona epitermal con vetas de cuarzo).",
-    "recomendacion": "ACCIÓN ESPECÍFICA. Ej: 🔴 MUESTREO URGENTE - Tomar muestra en afloramiento."
-  }
-]`;
-
-  const payload = {
-    model: MODEL_SMART,   // Sonnet para análisis complejo
-    max_tokens: 4096,
-    messages: [{ role: 'user', content: prompt }]
-  };
-
-  const response = await fetchWithRetry(
-    'https://api.anthropic.com/v1/messages',
-    { method: 'POST', headers: getHeaders(API_KEY), body: JSON.stringify(payload) }
-  );
-
-  if (!response.ok) throw new Error('Fallo al conectar con Claude Sonnet.');
-
-  const data = await response.json();
-  const content = data.content?.[0]?.text || '';
-  const match = content.match(/\[[\s\S]*\]/);
-  if (match) {
-    try { return JSON.parse(match[0]); } catch {}
-  }
-  return [];
-}
-
-// ═══════════════════════════════════════════════════════
-// 3. CHAT GEÓLOGO (historial limitado a últimos 10)
+// 1. CHAT GEÓLOGO (historial limitado a últimos 10)
 // ═══════════════════════════════════════════════════════
 export async function askClaudeGeologist(
   messagesHistory: { role: string; content: string }[]
 ): Promise<string> {
-  const SERVER_URL = getServerUrl();
+  const SERVER_URL = process.env.EXPO_PUBLIC_SERVER_URL?.trim();
+  if (!SERVER_URL) throw new Error('Error: servidor no configurado');
   const limitedHistory = messagesHistory.slice(-10);
 
   const response = await fetchWithRetry(
@@ -251,7 +60,7 @@ export async function askClaudeGeologist(
 }
 
 // ═══════════════════════════════════════════════════════
-// 4. ANÁLISIS AGRÍCOLA DE BIOMASA (AgroCrop)
+// 2. ANÁLISIS AGRÍCOLA DE BIOMASA (AgroCrop)
 // ═══════════════════════════════════════════════════════
 export interface CropBiomassStats {
   ndvi_mean: number;
@@ -271,7 +80,8 @@ export async function analyzeCropBiomassWithClaude(
   stats: CropBiomassStats,
   tipoCultivo: string
 ): Promise<string> {
-  const SERVER_URL = getServerUrl();
+  const SERVER_URL = process.env.EXPO_PUBLIC_SERVER_URL?.trim();
+  if (!SERVER_URL) throw new Error('Error: servidor no configurado');
 
   const response = await fetchWithRetry(
     `${SERVER_URL}/api/analisis-claude`,
@@ -294,7 +104,7 @@ export async function analyzeCropBiomassWithClaude(
 }
 
 // ═══════════════════════════════════════════════════════
-// 5. AGRÓNOMO IA POR CULTIVO (AgroCrop v5.0)
+// 3. AGRÓNOMO IA POR CULTIVO (AgroCrop v5.0)
 // ═══════════════════════════════════════════════════════
 export interface AgronomoConfig {
   nombre: string;
@@ -406,10 +216,12 @@ export async function askClaudeAgronomo(
   datosAnalisis?: any,
   imagenBase64?: string | null
 ): Promise<string> {
-  const SERVER_URL = getServerUrl();
+  const SERVER_URL = process.env.EXPO_PUBLIC_SERVER_URL?.trim();
+  if (!SERVER_URL) throw new Error('Error: servidor no configurado');
+
   const limitedHistory = messagesHistory.slice(-16);
 
-  // Build messages array — attach image to last user message if provided
+  // Attach image to last user message if provided
   let mensajes: any[];
   const lastMsg = limitedHistory[limitedHistory.length - 1];
   if (imagenBase64 && lastMsg?.role === 'user') {
@@ -427,14 +239,11 @@ export async function askClaudeAgronomo(
     mensajes = limitedHistory;
   }
 
-  const response = await fetchWithRetry(
-    `${SERVER_URL}/api/agronomo`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mensajes, tipoCultivo, datosAnalisis }),
-    }
-  );
+  const response = await fetch(`${SERVER_URL}/api/agronomo`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mensajes, tipoCultivo, datosAnalisis }),
+  });
 
   if (!response.ok) {
     const err = await response.text();
