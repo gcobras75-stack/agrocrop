@@ -1,5 +1,20 @@
 // app/core/AgroCropService.ts — Multi-polygon + OCR for AgroCrop
 
+/** Validates a coordinate array before sending to the server. */
+export function validarCoordenadasCliente(
+  coords: Array<{ latitude: number; longitude: number }>
+): boolean {
+  if (!coords || coords.length < 3 || coords.length > 500) return false;
+  return coords.every(
+    c =>
+      typeof c.latitude === 'number' &&
+      typeof c.longitude === 'number' &&
+      c.latitude >= -90 && c.latitude <= 90 &&
+      c.longitude >= -180 && c.longitude <= 180 &&
+      !isNaN(c.latitude) && !isNaN(c.longitude)
+  );
+}
+
 export interface AgroCropPolygon {
   id: string;
   nombre: string;

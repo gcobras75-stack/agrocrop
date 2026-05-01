@@ -1,6 +1,15 @@
 // app/core/ClaudeServices.ts — AgroCrop v5.5
 // Claude API calls go through Railway server — API key never exposed to the app.
 
+/** Sanitize user text before sending to the server. Removes dangerous chars, caps length. */
+export const sanitizarTexto = (texto: string, maxLen = 500): string =>
+  texto
+    .trim()
+    .slice(0, maxLen)
+    .replace(/[<>'";&]/g, '')
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+=/gi, '');
+
 // ─── RETRY CON BACKOFF EXPONENCIAL ─────────────────────
 async function fetchWithRetry(
   url: string,
@@ -221,9 +230,13 @@ export async function askClaudeAgronomo(
 
   const limitedHistory = messagesHistory.slice(-16);
 
-  // Attach image to last user message if provided
+  // Sanitize + attach image to last user message if provided
   let mensajes: any[];
   const lastMsg = limitedHistory[limitedHistory.length - 1];
+  const lastText = typeof lastMsg?.content === 'string'
+    ? sanitizarTexto(lastMsg.content, 2000)
+    : '¿Qué problema tiene esta planta?';
+
   if (imagenBase64 && lastMsg?.role === 'user') {
     mensajes = [
       ...limitedHistory.slice(0, -1),
@@ -231,9 +244,14 @@ export async function askClaudeAgronomo(
         role: 'user',
         content: [
           { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imagenBase64 } },
-          { type: 'text', text: typeof lastMsg.content === 'string' ? lastMsg.content : '¿Qué problema tiene esta planta?' },
+          { type: 'text', text: lastText },
         ],
       },
+    ];
+  } else if (lastMsg?.role === 'user' && typeof lastMsg.content === 'string') {
+    mensajes = [
+      ...limitedHistory.slice(0, -1),
+      { role: 'user', content: lastText },
     ];
   } else {
     mensajes = limitedHistory;

@@ -260,7 +260,8 @@ export default function AgroCropDashboard() {
       setChatMessages([...newContext, { role: 'assistant', content: response }]);
       triggerHaptic('success');
     } catch(e: any) {
-      Alert.alert('Error Chat IA', e.message);
+      console.error('[AgroCrop] Chat error:', e);
+      Alert.alert('Error', 'No se pudo completar la consulta. Intenta de nuevo.');
     } finally {
       setIsTypingChat(false);
     }
