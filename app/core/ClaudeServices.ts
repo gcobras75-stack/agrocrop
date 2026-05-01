@@ -6,6 +6,13 @@ type AnalysisPoint = { id: string; rank: number; base_score: number; indices: an
 const MODEL_FAST   = 'claude-haiku-4-5-20251001';   // Cámara y chat
 const MODEL_SMART  = 'claude-sonnet-4-6';            // Análisis espectral
 
+// ─── SERVIDOR RAILWAY (API KEY nunca sale de aquí) ─────
+function getServerUrl(): string {
+  const url = process.env.EXPO_PUBLIC_SERVER_URL?.trim();
+  if (!url) throw new Error('Configura EXPO_PUBLIC_SERVER_URL en tu .env');
+  return url;
+}
+
 // ─── RETRY CON BACKOFF EXPONENCIAL ─────────────────────
 async function fetchWithRetry(
   url: string,
@@ -17,7 +24,7 @@ async function fetchWithRetry(
     try {
       const response = await fetch(url, options);
       if (response.status === 429) {
-        const waitMs = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
+        const waitMs = Math.pow(2, attempt) * 1000;
         await new Promise(r => setTimeout(r, waitMs));
         continue;
       }
@@ -31,7 +38,7 @@ async function fetchWithRetry(
   throw lastError;
 }
 
-// ─── HEADERS COMUNES ───────────────────────────────────
+// ─── HELPERS para llamadas directas (ProspectorAI legacy) ──
 function getHeaders(apiKey: string): Record<string, string> {
   return {
     'Content-Type': 'application/json',
@@ -41,7 +48,6 @@ function getHeaders(apiKey: string): Record<string, string> {
   };
 }
 
-// ─── VALIDAR API KEY ────────────────────────────────────
 function getApiKey(): string {
   const key = process.env.EXPO_PUBLIC_CLAUDE_API_KEY?.trim();
   if (!key) throw new Error('Configura EXPO_PUBLIC_CLAUDE_API_KEY en tu .env');
@@ -218,32 +224,30 @@ Devuelve EXCLUSIVAMENTE un arreglo JSON válido (sin markdown):
 export async function askClaudeGeologist(
   messagesHistory: { role: string; content: string }[]
 ): Promise<string> {
-  const API_KEY = getApiKey();
-
-  // FIX: Limitar a los últimos 10 mensajes para no explotar contexto ni costo
+  const SERVER_URL = getServerUrl();
   const limitedHistory = messagesHistory.slice(-10);
 
-  const payload = {
-    model: MODEL_FAST,
-    max_tokens: 1000,
-    system: "Eres el asistente IA de ProspectorAI (Expo, React Native, TypeScript, SQLite). Ayuda al desarrollador con código, arquitectura, motor de prospección y geología. Eres Ing. de Software Elite y Geólogo.",
-    messages: limitedHistory
-  };
-
   const response = await fetchWithRetry(
-    'https://api.anthropic.com/v1/messages',
-    { method: 'POST', headers: getHeaders(API_KEY), body: JSON.stringify(payload) }
+    `${SERVER_URL}/api/chat`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mensajes: limitedHistory,
+        system: 'Eres el asistente IA de ProspectorAI (Expo, React Native, TypeScript, SQLite). Ayuda al desarrollador con código, arquitectura, motor de prospección y geología. Eres Ing. de Software Elite y Geólogo.',
+      }),
+    }
   );
 
   if (!response.ok) {
     const err = await response.text();
     let msg = err;
-    try { msg = JSON.parse(err).error?.message || err; } catch {}
-    throw new Error(`Anthropic: ${msg.substring(0, 100)}`);
+    try { msg = JSON.parse(err).error || err; } catch {}
+    throw new Error(`Servidor: ${msg.substring(0, 100)}`);
   }
 
   const data = await response.json();
-  return data.content?.[0]?.text || '';
+  return data.respuesta || '';
 }
 
 // ═══════════════════════════════════════════════════════
@@ -267,71 +271,26 @@ export async function analyzeCropBiomassWithClaude(
   stats: CropBiomassStats,
   tipoCultivo: string
 ): Promise<string> {
-  const API_KEY = getApiKey();
-
-  const isMango = tipoCultivo.toLowerCase().includes('mango');
-  const baseData = `Indices satelitales Sentinel-2 de ${stats.hectareas_cultivo_activo} hectareas, Sinaloa:
-- NDVI: ${stats.ndvi_mean} (vigor)
-- EVI: ${stats.evi_mean} (biomasa)
-- NDRE: ${stats.ndre_mean} (nitrogeno)
-- LSWI: ${stats.lswi_mean} (estres hidrico)
-- Vigor: ${stats.clasificacion_vigor}
-- Tonelaje estimado: ${stats.tonelaje_estimado} ton (${stats.tonelaje_minimo}-${stats.tonelaje_maximo})
-- Rendimiento: ${stats.rendimiento_por_hectarea} ton/ha
-- Area optima: ${stats.porcentaje_area_optima}%
-- Cultivo: ${tipoCultivo}`;
-
-  const prompt = isMango
-    ? `Eres agronomo experto en produccion de mango en Sinaloa (Escuinapa, Rosario).
-Analiza estos datos satelitales de una huerta de ${tipoCultivo}:
-
-ESTADO ACTUAL (imagen satelital):
-${baseData}
-
-Proporciona en MAXIMO 8 parrafos cortos:
-1. Estado sanitario del huerto y si esta EN BUEN CAMINO para la cosecha
-2. Estimacion de cosecha en toneladas (rango realista)
-3. El RIESGO PRINCIPAL que podria reducir la produccion (sequia, antracnosis, mosca, calor)
-4. 3 acciones CONCRETAS para las proximas semanas
-5. Comparativo con promedio Escuinapa: Ataulfo 12, Kent 14, Tommy 16 ton/ha
-6. Si la proyeccion de ${stats.rendimiento_por_hectarea} ton/ha es REALISTA para esta temporada
-
-Responde en espanol sencillo para productor en campo. Sin jerga excesiva.`
-    : `Eres agronomo experto en cultivos de Sinaloa (Valle de Culiacan, Los Mochis).
-Analiza estos datos satelitales de ${tipoCultivo}:
-
-ESTADO ACTUAL (imagen satelital):
-${baseData}
-
-Proporciona en MAXIMO 8 parrafos cortos:
-1. Diagnostico: esta el cultivo en buen camino? Que senales ves?
-2. RIESGO PRINCIPAL que podria reducir la proyeccion (sequia, plaga, temperatura)
-3. 3 acciones CONCRETAS para mejorar el rendimiento en las proximas semanas
-4. Es la proyeccion de ${stats.rendimiento_por_hectarea} ton/ha REALISTA para ${tipoCultivo} en Sinaloa?
-5. Comparacion con promedio historico de la region (maiz riego ~9.5, temporal ~4.5 ton/ha)
-
-Responde en espanol sencillo para productor en campo. Sin jerga excesiva.`;
-
-  const payload = {
-    model: MODEL_SMART,
-    max_tokens: 2500,
-    messages: [{ role: 'user', content: prompt }]
-  };
+  const SERVER_URL = getServerUrl();
 
   const response = await fetchWithRetry(
-    'https://api.anthropic.com/v1/messages',
-    { method: 'POST', headers: getHeaders(API_KEY), body: JSON.stringify(payload) }
+    `${SERVER_URL}/api/analisis-claude`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stats, tipoCultivo }),
+    }
   );
 
   if (!response.ok) {
     const err = await response.text();
     let msg = err;
-    try { msg = JSON.parse(err).error?.message || err; } catch {}
-    throw new Error(`Anthropic: ${msg.substring(0, 100)}`);
+    try { msg = JSON.parse(err).error || err; } catch {}
+    throw new Error(`Servidor: ${msg.substring(0, 100)}`);
   }
 
   const data = await response.json();
-  return data.content?.[0]?.text || 'No se obtuvo respuesta del análisis.';
+  return data.respuesta || 'No se obtuvo respuesta del análisis.';
 }
 
 // ═══════════════════════════════════════════════════════
@@ -447,25 +406,14 @@ export async function askClaudeAgronomo(
   datosAnalisis?: any,
   imagenBase64?: string | null
 ): Promise<string> {
-  const API_KEY = getApiKey();
-  const agronomo = AGRONOMOS[tipoCultivo] ?? AGRONOMOS.maiz_riego;
-
-  const contextoAnalisis = datosAnalisis ? `\n\nDATOS ACTUALES DE LA PARCELA DEL AGRICULTOR:
-- Cultivo: ${datosAnalisis.tipo_cultivo_label ?? tipoCultivo}
-- Hectáreas activas: ${datosAnalisis.hectareas_cultivo_activo} ha
-- NDVI promedio: ${datosAnalisis.ndvi_mean} (${datosAnalisis.clasificacion_vigor})
-- Tonelaje estimado: ${datosAnalisis.tonelaje_estimado} ton
-- Rendimiento: ${datosAnalisis.rendimiento_por_hectarea} ton/ha${datosAnalisis.proyeccion ? `\n- Proyección cosecha: ${datosAnalisis.proyeccion.fecha_cosecha} (${datosAnalisis.proyeccion.dias_a_cosecha} días)` : ''}
-- Imagen satelital: ${datosAnalisis.imagen_mas_reciente_global ?? ''} (${datosAnalisis.frescura?.satelite_mas_reciente ?? 'S2'})${datosAnalisis.clima_local?.temp_max_c != null ? `\n- Temperatura local: ${datosAnalisis.clima_local.temp_max_c}°C` : ''}${datosAnalisis.clima_local?.precip_mm != null ? `\n- Precipitación reciente: ${datosAnalisis.clima_local.precip_mm}mm` : ''}
-
-Cuando el agricultor pregunte sobre sus datos, refiérete a estos valores específicos.` : '';
-
+  const SERVER_URL = getServerUrl();
   const limitedHistory = messagesHistory.slice(-16);
 
-  let messages: any[];
+  // Build messages array — attach image to last user message if provided
+  let mensajes: any[];
   const lastMsg = limitedHistory[limitedHistory.length - 1];
   if (imagenBase64 && lastMsg?.role === 'user') {
-    messages = [
+    mensajes = [
       ...limitedHistory.slice(0, -1),
       {
         role: 'user',
@@ -476,30 +424,27 @@ Cuando el agricultor pregunte sobre sus datos, refiérete a estos valores espec�
       },
     ];
   } else {
-    messages = limitedHistory;
+    mensajes = limitedHistory;
   }
 
-  const payload = {
-    model: MODEL_SMART,
-    max_tokens: 1024,
-    system: agronomo.sistema + contextoAnalisis,
-    messages,
-  };
-
   const response = await fetchWithRetry(
-    'https://api.anthropic.com/v1/messages',
-    { method: 'POST', headers: getHeaders(API_KEY), body: JSON.stringify(payload) }
+    `${SERVER_URL}/api/agronomo`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mensajes, tipoCultivo, datosAnalisis }),
+    }
   );
 
   if (!response.ok) {
     const err = await response.text();
     let msg = err;
-    try { msg = JSON.parse(err).error?.message || err; } catch {}
-    throw new Error(`Anthropic (${response.status}): ${msg.substring(0, 100)}`);
+    try { msg = JSON.parse(err).error || err; } catch {}
+    throw new Error(`Servidor (${response.status}): ${msg.substring(0, 100)}`);
   }
 
   const data = await response.json();
-  return data.content?.[0]?.text ?? '';
+  return data.respuesta ?? '';
 }
 
 export default function DummyClaudeRoute() { return null; }

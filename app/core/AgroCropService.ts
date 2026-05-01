@@ -37,74 +37,23 @@ export async function extractCoordsFromPhoto(base64Image: string): Promise<{
   confianza?: string;
   error?: string;
 }> {
-  const apiKey = process.env.EXPO_PUBLIC_CLAUDE_API_KEY?.trim();
-  if (!apiKey) throw new Error('EXPO_PUBLIC_CLAUDE_API_KEY no configurada');
+  const serverUrl = process.env.EXPO_PUBLIC_SERVER_URL?.trim();
+  if (!serverUrl) throw new Error('EXPO_PUBLIC_SERVER_URL no configurada');
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await fetch(`${serverUrl}/api/ocr-titulo`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: { type: 'base64', media_type: 'image/jpeg', data: base64Image },
-          },
-          {
-            type: 'text',
-            text: `Extrae TODAS las coordenadas de los vertices del poligono que aparecen en este titulo parcelario mexicano (RAN, Procede, escritura agraria).
-
-Formatos posibles:
-- UTM: "X: 279589.73 m E, Y: 2699301.26 m N, Zona 13R"
-- Decimal: "Lat: 24.3994, Lng: -107.1714"
-- GMS: "24 23 58 N, 107 10 17 W"
-- Tabla con columnas V1, V2, etc.
-
-Si las coordenadas vienen en UTM, conviertelas a decimal WGS84 usando la zona indicada.
-
-Devuelve SOLO JSON valido:
-{
-  "vertices_detectados": [
-    {"vertice": 1, "lat": 24.3994, "lng": -107.1714}
-  ],
-  "formato_origen": "UTM_13R",
-  "datos_adicionales": {
-    "superficie_ha": 5.4,
-    "propietario": "...",
-    "ejido": "...",
-    "municipio": "..."
-  },
-  "confianza": "alta",
-  "notas": "..."
-}
-
-Si no hay coordenadas legibles devuelve:
-{"error": "No se detectaron coordenadas", "razon": "..."}`
-          }
-        ]
-      }]
-    })
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imagenBase64: base64Image }),
   });
 
   if (!response.ok) {
     const err = await response.text();
-    throw new Error(`Claude Vision error: ${response.status}`);
+    let msg = err;
+    try { msg = JSON.parse(err).error || err; } catch {}
+    throw new Error(`OCR servidor error: ${msg.substring(0, 100)}`);
   }
 
-  const data = await response.json();
-  const content = data.content?.[0]?.text || '';
-  const match = content.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error('Claude no devolvio JSON valido');
-
-  const parsed = JSON.parse(match[0]);
+  const parsed = await response.json();
   if (parsed.error) throw new Error(parsed.error);
 
   return {
