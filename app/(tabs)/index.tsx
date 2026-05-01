@@ -1142,8 +1142,7 @@ _Datos: ESA Copernicus, NASA, USGS_`;
         <MapView
           ref={mapRef}
           style={styles.map}
-          provider={Platform.OS === 'android' ? PROVIDER_DEFAULT : undefined}
-          mapType={Platform.OS === 'android' ? 'standard' : mapType}
+          mapType={mapType}
           showsUserLocation={false}
           followsUserLocation={false}
           showsCompass={false}
