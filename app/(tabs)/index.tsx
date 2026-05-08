@@ -516,7 +516,22 @@ export default function AgroCropDashboard() {
           setCropExtendedLoading(false);
         });
     } catch (e: any) {
-      setCropError(e.message || 'Error desconocido');
+      const raw: string = e.message || '';
+      let mensajeAmigable: string;
+      if (raw.includes('404') || raw.includes('Application not found') || raw.includes('Endpoint no encontrado')) {
+        mensajeAmigable = 'El servicio satelital está temporalmente fuera de línea.\nPor favor intenta en unos minutos.';
+      } else if (raw.includes('Timeout') || raw.includes('AbortError') || raw.includes('timeout')) {
+        mensajeAmigable = 'El análisis tardó demasiado (red lenta o servidor ocupado).\nIntenta de nuevo en un momento.';
+      } else if (raw.includes('Fallo de red') || raw.includes('Network request failed') || raw.includes('fetch')) {
+        mensajeAmigable = 'Sin conexión al servidor. Verifica tu internet e intenta de nuevo.';
+      } else if (raw.includes('500') || raw.includes('Error interno')) {
+        mensajeAmigable = 'Error interno del servidor satelital. Intenta de nuevo en unos minutos.';
+      } else if (raw.includes('Datos inválidos') || raw.includes('400')) {
+        mensajeAmigable = 'El polígono no es válido. Verifica que tenga al menos 3 vértices correctos.';
+      } else {
+        mensajeAmigable = 'No se pudo completar el análisis. Intenta de nuevo.';
+      }
+      setCropError(mensajeAmigable);
       setCropStep('');
       triggerHaptic('heavy');
     } finally {
