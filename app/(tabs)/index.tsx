@@ -10,7 +10,7 @@ import * as ImagePicker from 'expo-image-picker';
 import NetInfo from '@react-native-community/netinfo';
 import { initDB } from '../core/Database';
 import { askClaudeGeologist, analyzeCropBiomassWithClaude, CropBiomassStats, askClaudeAgronomo, AGRONOMOS, PREGUNTAS_RAPIDAS, sanitizarTexto } from '../core/ClaudeServices';
-import { getBiomassAnalysis, BiomassAnalysisResult, generateCirclePolygon, getBiomassGrid, GridCell, getBiomassExtended, BiomassExtendedResult } from '../core/GEEService';
+import { getBiomassAnalysis, BiomassAnalysisResult, generateCirclePolygon, getBiomassGrid, GridCell, getBiomassExtended, BiomassExtendedResult, verificarConexion, EstadoConexion } from '../core/GEEService';
 import { AgroCropPolygon, generatePolygonId, getPolygonColor, extractCoordsFromPhoto, calcConsolidatedSummary, validarCoordenadasCliente } from '../core/AgroCropService';
 import { guardarCalibracion, getFactorCorreccion, getPrecisionStats, getAdminStats, PrecisionStats } from '../core/SupabaseClient';
 
@@ -74,6 +74,42 @@ const CROP_TREE: Record<string, CropEntry> = {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Lo que ve el productor al tocar el punto de conexión. */
+const MENSAJE_CONEXION: Record<EstadoConexion | 'verificando', string> = {
+  verificando:      'Comprobando la conexión con el servidor...',
+  conectado:        'Conectado. El agrónomo y el análisis satelital están disponibles.',
+  sin_autorizacion: 'Tu versión de la app ya no está autorizada.\nDescarga la versión más reciente para seguir usando el agrónomo y el análisis.',
+  sin_conexion:     'Sin conexión con el servidor.\nPuedes ver el mapa, pero el agrónomo y el análisis no responden.',
+};
+
+const COLOR_CONEXION: Record<EstadoConexion | 'verificando', string> = {
+  verificando:      '#BDBDBD',
+  conectado:        COLORS.verdeNeon,
+  sin_autorizacion: '#FFA000',
+  sin_conexion:     '#888',
+};
+
+/** Traduce el error crudo del agrónomo a un mensaje que el productor entienda. */
+function mensajeErrorAgronomo(e: any): string {
+  const raw: string = e?.message || '';
+  if (raw.includes('404') || raw.includes('Endpoint no encontrado') || raw.includes('Application not found')) {
+    return 'El agrónomo está temporalmente fuera de línea.\nNo es tu teléfono ni tu señal — el servicio no responde. Intenta más tarde.';
+  }
+  if (raw.includes('servidor no configurado')) {
+    return 'Esta version de la app no quedo bien configurada.\nAvisa a soporte para que te pasen una nueva.';
+  }
+  if (raw.includes('Timeout') || raw.includes('AbortError') || raw.includes('timeout')) {
+    return 'El agrónomo tardó demasiado en responder (red lenta o servidor ocupado).\nIntenta de nuevo en un momento.';
+  }
+  if (raw.includes('Network request failed') || raw.includes('Fallo de red') || raw.includes('fetch')) {
+    return 'Sin conexión al servidor. Revisa tu internet e intenta de nuevo.';
+  }
+  if (raw.includes('500') || raw.includes('Error interno')) {
+    return 'El agrónomo tuvo un problema interno. Intenta de nuevo en unos minutos.';
+  }
+  return 'No se pudo conectar con el agrónomo. Intenta de nuevo.';
+}
+
 export default function AgroCropDashboard() {
   const mapRef = useRef<MapView>(null);
   const zoomTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -88,7 +124,7 @@ export default function AgroCropDashboard() {
   const [isTypingChat, setIsTypingChat] = useState(false);
 
   // --- Agrónomo IA ---
-  const [mensajesAgronomo, setMensajesAgronomo] = useState<{texto: string; esUsuario: boolean}[]>([]);
+  const [mensajesAgronomo, setMensajesAgronomo] = useState<{texto: string; esUsuario: boolean; esError?: boolean}[]>([]);
   const [inputAgronomo, setInputAgronomo] = useState('');
   const [cargandoAgronomo, setCargandoAgronomo] = useState(false);
   const [cultivoChat, setCultivoChat] = useState('');
@@ -112,13 +148,40 @@ export default function AgroCropDashboard() {
   const [isConnected, setIsConnected] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // Estado REAL del servidor. NetInfo solo dice si el teléfono tiene internet:
+  // decir "Conectado a Claude" con eso es mentira cuando el servidor no responde.
+  const [estadoServidor, setEstadoServidor] = useState<EstadoConexion | 'verificando'>('verificando');
+
   useEffect(() => {
+    let vivo = true;
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const revisar = async () => {
+      const estado = await verificarConexion();
+      if (vivo) setEstadoServidor(estado);
+    };
+
     const unsubscribe = NetInfo.addEventListener(state => {
-      const online = state.isConnected && state.isInternetReachable;
-      setIsConnected(!!online);
+      const online = !!(state.isConnected && state.isInternetReachable);
+      setIsConnected(online);
+      // Sin internet no tiene caso preguntarle al servidor.
+      if (!online) setEstadoServidor('sin_conexion');
+      else revisar();
     });
-    return () => unsubscribe();
+
+    revisar();
+    // Cada 2 min: suficiente para detectar una caída sin gastar el límite de
+    // 30 peticiones/minuto que el servidor aplica por IP.
+    timer = setInterval(revisar, 120000);
+
+    return () => {
+      vivo = false;
+      if (timer) clearInterval(timer);
+      unsubscribe();
+    };
   }, []);
+
+  const servidorOk = estadoServidor === 'conectado';
 
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [heading, setHeading] = useState<Location.LocationHeadingObject | null>(null);
@@ -284,9 +347,11 @@ export default function AgroCropDashboard() {
           cropData ?? undefined
         );
         setMensajesAgronomo([{ texto: saludo, esUsuario: false }]);
-      } catch {
-        const ag = AGRONOMOS[cultivo] ?? AGRONOMOS.maiz_riego;
-        setMensajesAgronomo([{ texto: `¡Hola! Soy ${ag.nombre}, ${ag.especialidad}. ¿En qué te puedo ayudar hoy?`, esUsuario: false }]);
+      } catch (e: any) {
+        // NO fabricar un saludo del agrónomo: haría creer al productor que el chat
+        // funciona cuando el servidor no respondió. Se muestra el fallo tal cual.
+        console.error('[AgroCrop] Agrónomo saludo error:', e);
+        setMensajesAgronomo([{ texto: mensajeErrorAgronomo(e), esUsuario: false, esError: true }]);
       } finally {
         setCargandoAgronomo(false);
       }
@@ -297,7 +362,7 @@ export default function AgroCropDashboard() {
     const texto = sanitizarTexto(textoOverride ?? inputAgronomo.trim(), 500);
     if (!texto && !imagenBase64) return;
     if (cargandoAgronomo) return;
-    const userMsg = { texto: texto || '📸 Foto enviada', esUsuario: true };
+    const userMsg: { texto: string; esUsuario: boolean; esError?: boolean } = { texto: texto || '📸 Foto enviada', esUsuario: true };
     const nuevos = [...mensajesAgronomo, userMsg];
     setMensajesAgronomo(nuevos);
     setInputAgronomo('');
@@ -305,14 +370,17 @@ export default function AgroCropDashboard() {
     triggerHaptic('medium');
     setTimeout(() => agronomoScrollRef.current?.scrollToEnd({ animated: true }), 80);
     try {
-      const historialApi = nuevos.map(m => ({ role: m.esUsuario ? 'user' : 'assistant', content: m.texto }));
+      // Los avisos de error no son turnos reales del agrónomo: se excluyen del historial.
+      const historialApi = nuevos
+        .filter(m => !m.esError)
+        .map(m => ({ role: m.esUsuario ? 'user' : 'assistant', content: m.texto }));
       const respuesta = await askClaudeAgronomo(historialApi, cultivoChat, cropData ?? undefined, imagenBase64);
       setMensajesAgronomo(prev => [...prev, { texto: respuesta, esUsuario: false }]);
       triggerHaptic('success');
       setTimeout(() => agronomoScrollRef.current?.scrollToEnd({ animated: true }), 80);
     } catch (e: any) {
       console.error('[AgroCrop] Agrónomo error:', e);
-      setMensajesAgronomo(prev => [...prev, { texto: 'No se pudo conectar con el agrónomo. Intenta de nuevo.', esUsuario: false }]);
+      setMensajesAgronomo(prev => [...prev, { texto: mensajeErrorAgronomo(e), esUsuario: false, esError: true }]);
     } finally {
       setCargandoAgronomo(false);
     }
@@ -1213,10 +1281,10 @@ _Datos: ESA Copernicus, NASA, USGS_`;
           <Text style={styles.headerTitle}>🌿 AgroCrop</Text>
           <View style={styles.headerRight}>
             <TouchableOpacity
-              onPress={() => Alert.alert('Conexion', isConnected ? 'Online (Conectado a Claude)' : 'Offline (Motor Local)')}
+              onPress={() => Alert.alert('Conexión', MENSAJE_CONEXION[estadoServidor])}
               style={styles.headerOnlineIndicator}
             >
-              <View style={[styles.onlineDot, { backgroundColor: isConnected ? COLORS.verdeNeon : '#888' }]} />
+              <View style={[styles.onlineDot, { backgroundColor: COLOR_CONEXION[estadoServidor] }]} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.mapTypeToggle}
@@ -2478,21 +2546,31 @@ _Datos: ESA Copernicus, NASA, USGS_`;
                   </View>
                 )}
                 {mensajesAgronomo.map((msg, i) => (
-                  <View key={i} style={[styles.agronomoMsgRow, msg.esUsuario && { justifyContent: 'flex-end' }]}>
-                    {!msg.esUsuario && (
-                      <View style={styles.agronomoAvatar}>
-                        <Text style={{ fontSize: 18 }}>{ag.avatar}</Text>
+                  msg.esError ? (
+                    /* Aviso del sistema: sin avatar ni burbuja del agrónomo, para que
+                       nunca se confunda con una respuesta real del especialista. */
+                    <View key={i} style={styles.agronomoErrorRow}>
+                      <View style={styles.agronomoErrorBox}>
+                        <Text style={styles.agronomoErrorText}>⚠️  {msg.texto}</Text>
                       </View>
-                    )}
-                    <View style={[
-                      styles.agronomoBubble,
-                      msg.esUsuario ? styles.agronomoBubbleUser : styles.agronomoBubbleBot,
-                    ]}>
-                      <Text style={[styles.agronomoBubbleText, msg.esUsuario && { color: '#FFF' }]}>
-                        {msg.texto}
-                      </Text>
                     </View>
-                  </View>
+                  ) : (
+                    <View key={i} style={[styles.agronomoMsgRow, msg.esUsuario && { justifyContent: 'flex-end' }]}>
+                      {!msg.esUsuario && (
+                        <View style={styles.agronomoAvatar}>
+                          <Text style={{ fontSize: 18 }}>{ag.avatar}</Text>
+                        </View>
+                      )}
+                      <View style={[
+                        styles.agronomoBubble,
+                        msg.esUsuario ? styles.agronomoBubbleUser : styles.agronomoBubbleBot,
+                      ]}>
+                        <Text style={[styles.agronomoBubbleText, msg.esUsuario && { color: '#FFF' }]}>
+                          {msg.texto}
+                        </Text>
+                      </View>
+                    </View>
+                  )
                 ))}
                 {cargandoAgronomo && (
                   <View style={[styles.agronomoMsgRow]}>
@@ -3440,6 +3518,12 @@ const styles = StyleSheet.create({
   },
   agronomoBubbleUser: { backgroundColor: COLORS.verdeMedio, borderBottomRightRadius: 4 },
   agronomoBubbleText: { color: '#1C1C1E', fontSize: 15, lineHeight: 22 },
+  agronomoErrorRow: { alignItems: 'center', marginBottom: 12, paddingHorizontal: 8 },
+  agronomoErrorBox: {
+    maxWidth: '92%', backgroundColor: '#FFF3E0', borderWidth: 1,
+    borderColor: '#FFB74D', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 14,
+  },
+  agronomoErrorText: { color: '#7A4A00', fontSize: 13, lineHeight: 19, textAlign: 'center' },
   agronomoQLabel: { color: '#888', fontSize: 11, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 },
   agronomoChip: {
     backgroundColor: '#FFF', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7,

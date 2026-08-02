@@ -10,26 +10,61 @@ export const sanitizarTexto = (texto: string, maxLen = 500): string =>
     .replace(/javascript:/gi, '')
     .replace(/on\w+=/gi, '');
 
+/**
+ * Cabeceras comunes. El token identifica a la app frente al servidor; sin él
+ * todo /api/* responde 401 en cuanto se active la autenticación obligatoria.
+ */
+export function buildHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  };
+  const token = process.env.EXPO_PUBLIC_APP_TOKEN?.trim();
+  if (token) headers['X-App-Token'] = token;
+  return headers;
+}
+
+/** fetch con timeout duro. Sin esto una petición colgada nunca se resuelve. */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ─── RETRY CON BACKOFF EXPONENCIAL ─────────────────────
 async function fetchWithRetry(
   url: string,
   options: RequestInit,
-  maxRetries = 3
+  maxRetries = 3,
+  timeoutMs = 60000
 ): Promise<Response> {
   let lastError: Error = new Error('Unknown error');
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const response = await fetch(url, options);
+      const response = await fetchWithTimeout(url, options, timeoutMs);
       if (response.status === 429) {
         const waitMs = Math.pow(2, attempt) * 1000;
         await new Promise(r => setTimeout(r, waitMs));
         continue;
       }
+      // 401/403 no se arreglan reintentando: es el token, no la red.
+      if (response.status === 401 || response.status === 403) return response;
       return response;
     } catch (e: any) {
-      lastError = e;
-      const waitMs = Math.pow(2, attempt) * 1000;
-      await new Promise(r => setTimeout(r, waitMs));
+      lastError = e?.name === 'AbortError'
+        ? new Error(`Timeout tras ${Math.round(timeoutMs / 1000)}s`)
+        : e;
+      if (attempt < maxRetries - 1) {
+        await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));
+      }
     }
   }
   throw lastError;
@@ -49,7 +84,7 @@ export async function askClaudeGeologist(
     `${SERVER_URL}/api/chat`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: buildHeaders(),
       body: JSON.stringify({
         mensajes: limitedHistory,
         system: 'Eres el asistente IA de ProspectorAI (Expo, React Native, TypeScript, SQLite). Ayuda al desarrollador con código, arquitectura, motor de prospección y geología. Eres Ing. de Software Elite y Geólogo.',
@@ -96,9 +131,11 @@ export async function analyzeCropBiomassWithClaude(
     `${SERVER_URL}/api/analisis-claude`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: buildHeaders(),
       body: JSON.stringify({ stats, tipoCultivo }),
-    }
+    },
+    3,
+    90000
   );
 
   if (!response.ok) {
@@ -257,11 +294,20 @@ export async function askClaudeAgronomo(
     mensajes = limitedHistory;
   }
 
-  const response = await fetch(`${SERVER_URL}/api/agronomo`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mensajes, tipoCultivo, datosAnalisis }),
-  });
+  // Con foto el cuerpo lleva la imagen en base64: en red rural sube lento, por
+  // eso el timeout es más holgado y se reintenta menos veces.
+  const conFoto = Boolean(imagenBase64);
+
+  const response = await fetchWithRetry(
+    `${SERVER_URL}/api/agronomo`,
+    {
+      method: 'POST',
+      headers: buildHeaders(),
+      body: JSON.stringify({ mensajes, tipoCultivo, datosAnalisis }),
+    },
+    conFoto ? 2 : 3,
+    conFoto ? 120000 : 60000
+  );
 
   if (!response.ok) {
     const err = await response.text();

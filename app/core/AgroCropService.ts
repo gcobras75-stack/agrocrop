@@ -1,5 +1,7 @@
 // app/core/AgroCropService.ts — Multi-polygon + OCR for AgroCrop
 
+import { buildHeaders } from './ClaudeServices';
+
 /** Validates a coordinate array before sending to the server. */
 export function validarCoordenadasCliente(
   coords: Array<{ latitude: number; longitude: number }>
@@ -55,11 +57,26 @@ export async function extractCoordsFromPhoto(base64Image: string): Promise<{
   const serverUrl = process.env.EXPO_PUBLIC_SERVER_URL?.trim();
   if (!serverUrl) throw new Error('EXPO_PUBLIC_SERVER_URL no configurada');
 
-  const response = await fetch(`${serverUrl}/api/ocr-titulo`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ imagenBase64: base64Image }),
-  });
+  // La foto del título va en base64: timeout holgado para red rural.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 120000);
+  let response: Response;
+  try {
+    response = await fetch(`${serverUrl}/api/ocr-titulo`, {
+      method: 'POST',
+      headers: buildHeaders(),
+      body: JSON.stringify({ imagenBase64: base64Image }),
+      signal: controller.signal,
+    });
+  } catch (e: any) {
+    throw new Error(
+      e?.name === 'AbortError'
+        ? 'La lectura del título tardó demasiado. Revisa tu señal e intenta de nuevo.'
+        : `Sin conexión al servidor: ${e?.message ?? 'error de red'}`
+    );
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!response.ok) {
     const err = await response.text();

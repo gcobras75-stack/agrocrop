@@ -4,6 +4,8 @@
  * All requests route through EXPO_PUBLIC_SERVER_URL to avoid CORS and key exposure.
  */
 
+import { buildHeaders } from './ClaudeServices';
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -313,6 +315,31 @@ function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number =
     .finally(() => clearTimeout(timer));
 }
 
+export type EstadoConexion = 'conectado' | 'sin_autorizacion' | 'sin_conexion';
+
+/**
+ * Ping real al servidor. NO usa /health a propósito: /health está fuera del
+ * control de acceso, así que responde 200 aunque el token sea inválido — diría
+ * "conectado" mientras todo lo demás falla con 401.
+ *
+ * En su lugar pega a /api/gee/tiles sin parámetros: el servidor valida el token
+ * antes que los parámetros, así que 400 significa "pasé la autenticación" sin
+ * llegar a consultar Earth Engine. Es barato y sí distingue los tres estados.
+ */
+export async function verificarConexion(timeoutMs = 8000): Promise<EstadoConexion> {
+  try {
+    const response = await fetchWithTimeout(
+      `${getServerUrl()}/api/gee/tiles`,
+      { method: 'GET', headers: buildHeaders() },
+      timeoutMs
+    );
+    if (response.status === 401 || response.status === 403) return 'sin_autorizacion';
+    return 'conectado';
+  } catch {
+    return 'sin_conexion';
+  }
+}
+
 function buildQueryString(params: Record<string, string | number | undefined>): string {
   return Object.entries(params)
     .filter(([, v]) => v !== undefined && v !== null && v !== '' && String(v) !== 'undefined' && String(v) !== 'null')
@@ -329,7 +356,7 @@ async function geeGet<T>(path: string, params: Record<string, string | number | 
   try {
     response = await fetchWithTimeout(url, {
       method: 'GET',
-      headers: { Accept: 'application/json' },
+      headers: buildHeaders(),
     }, 60000);
   } catch (networkErr: any) {
     const reason = networkErr.name === 'AbortError' ? 'Timeout 30s' : networkErr.message;
@@ -531,7 +558,7 @@ export async function getBiomassAnalysis(
   try {
     response = await fetchWithTimeout(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: buildHeaders(),
       body: JSON.stringify({ coordinates, fecha_inicio, fecha_fin, tipo_cultivo }),
     }, 90000);
   } catch (networkErr: any) {
@@ -579,7 +606,7 @@ export async function getBiomassExtended(
   try {
     response = await fetchWithTimeout(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: buildHeaders(),
       body: JSON.stringify({ coordinates, fecha_inicio, fecha_fin }),
     }, 180000);
   } catch (networkErr: any) {
@@ -653,7 +680,7 @@ export async function getBiomassGrid(
   try {
     response = await fetchWithTimeout(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: buildHeaders(),
       body: JSON.stringify(reqBody),
     }, 60000);
   } catch (networkErr: any) {
