@@ -2,7 +2,7 @@
   "expo": {
     "name": "AgroCrop",
     "slug": "agrocrop",
-    "version": "5.7.0",
+    "version": "5.8.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "agrocrop",
@@ -28,7 +28,7 @@
     },
     "android": {
       "package": "com.ecapro.agrocrop",
-      "versionCode": 1,
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

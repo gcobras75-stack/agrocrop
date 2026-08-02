@@ -45,7 +45,8 @@ app-example
 # MCP config — contains API tokens, never push
 .mcp.json
 
-# Backend server — deployed separately to Railway
+# Backend server — vive en gcobras75-stack/prospector-gee-server, desplegado a
+# Railway (develop -> staging, master -> producción)
 server/
 
 # generated native folders
